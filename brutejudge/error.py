@@ -1,0 +1,2 @@
+class BruteError(Exception):
+    pass
