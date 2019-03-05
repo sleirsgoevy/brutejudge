@@ -27,11 +27,11 @@ def do_brute(self, cmd):
         except ValueError:
             raise BruteError("max_tests must be a number")
     srch.execute(code, max_tests)
-    if len(sp) == 2:
+    if len(sp) == 2 or sp[2] == '-':
         from sys import stdout as file
         do_close = False
     else:
-        try: file = open(sp[2], "w")
+        try: file = open(sp[2], "a")
         except IOError as e:
             raise BruteError("Error creating output file: " + str(e))
         do_close = True

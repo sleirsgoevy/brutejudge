@@ -1,4 +1,5 @@
 import brutejudge.http as http
+from .error import BruteError
 from .injector import Injector
 
 class Finished(BaseException):
@@ -21,9 +22,12 @@ class Searcher:
     def __getattr__(self, attr):
         def func(*args):
             print("#brute:", attr, args)
+            submissions0 = http.submission_list(self.url, self.cookie)
             http.submit(self.url, self.cookie, self.task, 23, self.injector.call(attr, *args, input_file=self.input_file, output_file=self.output_file))
             result = [[]]
-            submission = http.submission_list(self.url, self.cookie)[0][0]
+            submissions = http.submission_list(self.url, self.cookie)
+            if submissions == submissions0:
+                raise BruteError("Error sending.")
             while not result[0]:
                 result = http.submission_results(self.url, self.cookie, submission)
             if self.testno >= len(result[0]):

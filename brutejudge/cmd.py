@@ -1,5 +1,5 @@
-import cmd, sys, traceback, os
-from .http import login, task_list, submission_list, submission_results, submission_status, submit, status, scores, compile_error
+import cmd, sys, traceback, os, shlex
+from .http import login, task_list, submission_list, submission_results, submission_status, submit, status, scores, compile_error, submission_source, task_ids, compiler_list
 from .error import BruteError
 import brutejudge.commands
 
@@ -10,8 +10,22 @@ class BruteCMD(cmd.Cmd):
     prompt = 'brutejudge> '
     def __init__(self):
         cmd.Cmd.__init__(self)
-        self.url = None
-        self.cookie = None
+        self._url = None
+        self._cookie = None
+    @property
+    def url(self):
+        if self._url != None: return self._url
+        raise BruteError("Not logged in")
+    @url.setter
+    def url(self, val):
+        self._url = val
+    @property
+    def cookie(self):
+        if self._cookie != None: return self._cookie
+        raise BruteError("Not logged in")
+    @cookie.setter
+    def cookie(self, val):
+        self._cookie = val
     def do_login(self, cmd):
         """
         usage: login <login_page_url> <username>
@@ -53,7 +67,7 @@ class BruteCMD(cmd.Cmd):
             return self.do_help('submissions')
         if isspace(cmd):
             print('Submission ID\tTask')
-            for i, j in zip(*submission_list(self.url, self.cookie)):
+            for i, j in zip(*map(reversed, submission_list(self.url, self.cookie))):
                 print('%s\t\t%s'%(i, j))
         else:
             for i, j in zip(*submission_results(self.url, self.cookie, int(cmd))):
@@ -74,12 +88,12 @@ class BruteCMD(cmd.Cmd):
         if not sp[1].isnumeric():
             raise BruteError("lang_id must be a number")
         try:
-            with open(sp[2], 'r') as file:
+            with open(sp[2], 'rb') as file:
                 data = file.read()
         except FileNotFoundError:
             raise BruteError("File not found.")
-        except UnicodeDecodeError:
-            raise BruteError("File is binary.")
+#       except UnicodeDecodeError:
+#           raise BruteError("File is binary.")
         submit(self.url, self.cookie, task_id, int(sp[1]), data)
     def do_shell(self, cmd):
         """
@@ -87,13 +101,15 @@ class BruteCMD(cmd.Cmd):
 
         Run a shell command.
         """
-        os.system(cmd)
+        os.system('bash -c '+shlex.quote(cmd))
     def do_status(self, cmd):
         """
         usage: status [submission_id]
 
         Show summary.
         """
+        if not (isspace(cmd) or cmd.strip().isnumeric()):
+            return self.do_help('status')
         if not isspace(cmd):
             splitted = cmd.split()
             if len(splitted) != 1:
@@ -102,8 +118,8 @@ class BruteCMD(cmd.Cmd):
             return
         ans = status(self.url, self.cookie)
         print('Task\tStatus')
-        for k, v in ans.items():
-            print(k+'\t'+v)
+        for k, v in sorted(list(ans.items())):
+            print(k+'\t'+str(v))
     def do_scores(self, cmd):
         """
         usage: scores
@@ -116,11 +132,23 @@ class BruteCMD(cmd.Cmd):
         print('Task\tScore')
         for k, v in ans.items():
             print(k+'\t'+str(v))
+    def do_source(self, cmd):
+        """
+        usage: source <submission_id>
+
+        Show program source code for a solution.
+        """
+        if not cmd.strip().isnumeric():
+            return self.do_help('source')
+        src = submission_source(self.url, self.cookie, int(cmd))
+        if src == None:
+            raise BruteError('Source code is not available')
+        print(src.decode('utf-8', 'replace'))
     def onecmd(self, c):
         try:
             try: return cmd.Cmd.onecmd(self, c)
-            except BruteError: raise
-            except Exception:
+            except (BruteError, SystemExit): raise
+            except BaseException:
                 raise BruteError(traceback.format_exc())
         except BruteError as e:
             self.print_error(e)
@@ -142,6 +170,12 @@ class BruteCMD(cmd.Cmd):
     def do_EOF(self, cmd=None):
         print()
         exit()
+    def do_python(self, cmd):
+        if cmd and not cmd.isspace():
+            exec(cmd)
+        else:
+            import code
+            code.interact(local={'self': self})
     def do_geterror(self, cmd):
         """
         usage: geterror <subm_id>
@@ -156,3 +190,22 @@ class BruteCMD(cmd.Cmd):
             raise BruteError('Submission ID must be a number')
         except IndexError:
             print('Success')
+    def do_compilers(self, cmd):
+        """
+        usage: compilers <task>
+
+        Get list of all all available compilers
+        """
+        task = cmd.strip()
+        if not task:
+            return self.do_help('compilers')
+        tasks = task_list(self.url, self.cookie)
+        ids = task_ids(self.url, self.cookie)
+        try:
+            prob_id = ids[tasks.index(task)]
+        except (ValueError, IndexError):
+            raise BruteError("No such task")
+        ans = compiler_list(self.url, self.cookie, prob_id)
+        print("ID\tCompiler")
+        for i, j, k in ans:
+            print(i, j+' - '+k, sep='\t')
