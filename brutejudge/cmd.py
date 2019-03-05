@@ -1,5 +1,5 @@
 import cmd, sys, traceback, os, shlex
-from .http import login, task_list, submission_list, submission_results, submission_status, submit, status, scores, compile_error, submission_source, task_ids, compiler_list
+from .http import login, task_list, submission_list, submission_results, submission_status, submit, status, scores, compile_error, submission_source, task_ids, compiler_list, submission_stats, submission_score
 from .error import BruteError
 import brutejudge.commands
 
@@ -71,7 +71,7 @@ class BruteCMD(cmd.Cmd):
                 print('%s\t\t%s'%(i, j))
         else:
             for t, (i, j) in enumerate(zip(*submission_results(self.url, self.cookie, int(cmd)))):
-                print('%3d'%t, i, j)
+                print('%3d'%(t+1), i, j)
     def do_submit(self, cmd):
         """
         usage: submit <task> <lang_id> <file>
@@ -122,16 +122,23 @@ class BruteCMD(cmd.Cmd):
             print(k+'\t'+str(v))
     def do_scores(self, cmd):
         """
-        usage: scores
+        usage: scores [subm_id]
 
-        Show scores for each task.
+        Show score for a solution if subm_id is specified.
+        Show scores for each task if subm_id is not specified.
         """
-        if not isspace(cmd):
-            return self.do_help('scores')
-        ans = scores(self.url, self.cookie)
-        print('Task\tScore')
-        for k, v in ans.items():
-            print(k+'\t'+str(v))
+        if isspace(cmd):
+            ans = scores(self.url, self.cookie)
+            print('Task\tScore')
+            for k, v in ans.items():
+                print(k+'\t'+str(v))
+        else:
+            if len(cmd.split()) != 1:
+                return self.do_help('scores')
+            try: subm_id = int(cmd)
+            except ValueError:
+                return self.do_help('scores')
+            print(submission_score(self.url, self.cookie, subm_id))
     def do_source(self, cmd):
         """
         usage: source <submission_id>
@@ -172,7 +179,7 @@ class BruteCMD(cmd.Cmd):
         sys.exit(0)
     def do_python(self, cmd):
         if cmd and not cmd.isspace():
-            exec(cmd)
+            exec(compile(cmd, '<string>', 'single'))
         else:
             import code
             code.interact(local={'self': self})
@@ -209,3 +216,18 @@ class BruteCMD(cmd.Cmd):
         print("ID\tCompiler")
         for i, j, k in ans:
             print(i, j+' - '+k, sep='\t')
+    def do_stats(self, cmd):
+        """
+        usage: stats <subm_id>
+
+        Show statistics for a given submission
+        """
+        sp = cmd.split()
+        if len(sp) != 1:
+            return self.do_help('stats')
+        if not sp[0].isnumeric():
+            raise BruteError('Submission ID must be a number')
+        stats, stats_str = submission_stats(self.url, self.cookie, int(sp[0]))
+        if stats_str != None: print(stats_str.strip())
+        import pprint
+        pprint.pprint(stats)

@@ -22,12 +22,13 @@ def do_contests(self, cmd):
     url = x[0]+'contest_id=%d'+'&'.join(['']+x[1].split('&', 1)[1:])
     def try_one(idx):
         name = contest_name(url % idx)
-        if name != None: print(idx, name, sep='\t')
+        if name != None: return '%s\t%s'%(idx, name)
     tpe = ThreadPoolExecutor(thread_num)
     try:
         i = 1
         while True:
             i2 = i + thread_num
-            list(tpe.map(try_one, range(i, i2)))
+            for i in tpe.map(try_one, range(i, i2)):
+                if i != None: print(i)
             i = i2
     except KeyboardInterrupt: pass

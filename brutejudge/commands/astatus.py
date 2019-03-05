@@ -3,7 +3,7 @@ from brutejudge.http import submission_status
 from brutejudge.error import BruteError
 
 def still_running(s):
-    return s.endswith('...') or ', ' in s or s in ('Compiling', 'Running', 'Judging')
+    return s.endswith('...') or ', ' in s or s in ('Compiling', 'Running', 'Judging', 'Check failed')
 
 def do_astatus(self, cmd):
     """

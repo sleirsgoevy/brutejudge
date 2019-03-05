@@ -16,6 +16,10 @@ def get_urls(main_url):
          'source': main_url + '/download-run/' + sid + '?run_id={run_id}',
          'submission': main_url + '/view-problem-submit/' + sid + '?prob_id={prob_id}',
          'submit': main_url,
-        'start_virtual': main_url + '&action=144',
+         'start_virtual': main_url + '?SID=' + sid[1:] + '&action=144',
+         'stop_virtual': main_url + '?SID=' + sid[1:] + '&action=145',
+         'download_file': main_url + '?SID=' + sid[1:] + '&prob_id={prob_id}&action=194&file={filename}',
+         'clars': main_url + '/view-clars/' + sid + '?all_clars=1',
+         'read_clar': main_url + '/view-clar/' + sid + '?clar_id={clar_id}',
          'sid': sid[1:]
     }

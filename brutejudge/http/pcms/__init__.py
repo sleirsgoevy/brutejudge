@@ -3,11 +3,19 @@ from .libpcms import PCMS as LPCMS
 from brutejudge.error import BruteError
 
 class PCMS:
+    @staticmethod
+    def detect(url):
+        return LPCMS.detect(url)
     def __init__(self, url, login, password):
         try: self.pcms = LPCMS(url, (login, password))
         except AssertionError as e: raise BruteError(str(e))
         self._subms = []
         self._subms_set = set()
+        self._clars = []
+        self._messages = []
+        self._user_clars = []
+        self._user_clars_set = set()
+        self.pcms.set_locale('English')
         self.submission_list()
     @staticmethod
     def _remove_tags(t):
@@ -105,5 +113,71 @@ class PCMS:
     def compiler_list(self, task_id):
         tasks, langs, jp, vs = self.pcms.get_submit()
         return [(i + 1, j, k) for i, (j, k) in enumerate(sorted(langs.items())) if j in jp[tasks[task_id]]]
+    def submission_stats(self, subm_id):
+        task, attempt = self._decode_subm_id(subm_id)
+        ans = {}
+        score = self.submission_score(subm_id)
+        if score != None: ans['score'] = score
+        proto = self.pcms.get_protocol(task, attempt)
+        if proto == None:
+            raise BruteError("Failed to fetch testing protocol.")
+        group_scores = []
+        passed = 0
+        failed = 0
+        for i in proto:
+            if 'head group-score' in i[1]:
+                score = int(i[1]['head group-score'].split(' = ', 1)[1].split('<', 1)[0])
+                group_scores.append(score)
+            if 'outcome' not in i[1]: continue
+            if i[1]['outcome'] in ('Accepted', 'OK'): passed += 1
+            else: failed += 1
+        if passed + failed != 0:
+            ans['tests'] = {}
+            ans['tests']['total'] = passed + failed
+            ans['tests']['success'] = passed
+            ans['tests']['fail'] = failed
+        if group_scores: ans['group_scores'] = group_scores
+        return (ans, '')
+    def download_file(self, *args):
+        raise BruteError("STUB")
     def do_action(self, *args):
         raise BruteError("Not implemented on PCMS")
+    def problem_info(self, task_id):
+        return ({}, self.pcms.get_links())
+    def submission_score(self, subm_id):
+        task, attempt = self._decode_subm_id(subm_id)
+        subms = self.pcms.get_submissions()
+        score = None
+        for i in subms[task]:
+            if 'attempt' in i[1] and int(i[1]['attempt']) == attempt:
+                if 'score' in i[1]:
+                    score = int(i[1]['score'].split(' = ', 1)[1])
+        return score
+    def _get_clars(self):
+        tasks, clars, vs = self.pcms.get_clars()
+        self._clars = list(clars)
+        return tasks, clars, vs
+    def clars(self):
+        self._get_clars()
+        self._messages = [j for i, j in self.pcms.get_messages() if i == 'msg']
+        data = [(i * 2, j[1]['text'].split('.', 1)[0]+': '+j[1]['text pre'].replace('\r', '').replace('\n', ' ')+': '+j[1]['type']) for i, j in enumerate(reversed(self._clars))]
+        data += [(i * 2 + 1, j) for i, j in enumerate(reversed(self._messages))]
+        for x in data:
+            if x[0] not in self._user_clars_set:
+                self._user_clars_set.add(x[0])
+                self._user_clars.append(x)
+        return [i[0] for i in reversed(self._user_clars)], [i[1] for i in reversed(self._user_clars)]
+    def submit_clar(self, task, subject, text):
+        tasks, clars, vs = self._get_clars()
+        #clars = list: type, text, 'text pre', type, 'answer pre'
+        try: task = tasks[task]
+        except IndexError: pass
+        try: self.pcms.submit_clar(task, subject, text, vs)
+        except AssertionError: raise BruteError("Failed to submit clar")
+    def read_clar(self, id):
+        self._get_clars()
+        id, kind = divmod(id, 2)
+        if kind == 0:
+            return self._clars[-1-id][1]['answer pre']
+        else:
+            return self._messages[-1-id]

@@ -1,0 +1,124 @@
+import urllib.request, urllib.parse, html, json
+from brutejudge.error import BruteError
+from brutejudge.http.openerwr import OpenerWrapper
+
+class CodeForces:
+    @staticmethod
+    def detect(url):
+        url = url.split('/')
+        return url[:2] == ['https:', ''] and ('.'+url[2]).endswith('.codeforces.com') and url[3] in ('contest', 'contests')
+    @staticmethod
+    def _get_csrf(data):
+        return data.split('<meta name="X-Csrf-Token" content="', 1)[1].split('"', 1)[0]
+    def __init__(self, url, login, password):
+        if url.find('/contest') == url.find('/contests'):
+            url = '/contest'.join(url.split('/contests', 1))
+        self.base_url = url
+        host = url.split('/')[2]
+        self.opener = OpenerWrapper(urllib.request.build_opener(urllib.request.HTTPCookieProcessor))
+        csrf = self._get_csrf(self.opener.open('https://%s/enter?back=%%2F'%host).read().decode('utf-8', 'replace'))
+        ln = self.opener.open('https://%s/enter?back=%%2F'%host, urllib.parse.urlencode({
+            'csrf_token': csrf,
+            'action': 'enter',
+            'ftaa': '',
+            'bfaa': '',
+            'handleOrEmail': login,
+            'password': password
+        }).encode('ascii'))
+        if ln.geturl() != 'https://%s/'%host:
+            raise BruteError("Login failed.")
+    def _get_submit(self):
+        data = self.opener.open(self.base_url+'/submit')
+        if data.geturl() != self.base_url+'/submit':
+            return [], [], None
+        data = data.read().decode('utf-8', 'replace')
+        csrf = self._get_csrf(data)
+        data1 = data.split('name="submittedProblemIndex">', 1)[1].split('</select>', 1)[0].split('<option value="')
+        tasks = [i.split('"', 1)[0] for i in data1[2:]]
+        data2 = data.split('name="programTypeId"">', 1)[1].split('</select>', 1)[0].split('<option value="')
+        langs = [(int(i.split('"', 1)[0]), html.unescape(i.split('>', 1)[1].split('</option>', 1)[0].strip())) for i in data2[1:]]
+        short_codes = {43: 'gcc', 42: 'g++11', 50: 'g++14', 54: 'g++', 2: 'msvc2010', 59: 'msvc2017', 9: 'mcs', 7: 'python', 31: 'python3', 40: 'pypy', 41: 'pypy3'}
+        langs_ans = []
+        for i, j in langs:
+            langs_ans.append((i, short_codes.get(i, str(i)), j))
+        return (tasks, langs_ans, csrf)
+    def _get_submissions(self):
+        data = self.opener.open(self.base_url+'/my')
+        if data.geturl() != self.base_url+'/my':
+            raise BruteError("Failed to fetch submission list")
+        data = data.read().decode('utf-8', 'replace')
+        csrf = self._get_csrf(data)
+        data = data.replace('<tr class="last-row" data-submission-id="', '<tr data-submission-id="').split('<tr data-submission-id="')
+        subms = []
+        for i in data[1:]:
+            subm_id = int(i.split('"', 1)[0])
+            meta = {}
+            data2 = i.split('>', 1)[1].split('</tr>', 1)[0].split('<td')
+            for j in data2[1:]:
+                try: cls = j.split('class="', 1)[1].split('"', 1)[0]
+                except IndexError: cls = None
+                data = j.split('>', 1)[1].split('</td>', 1)[0]
+                meta[cls] = data
+            subms.append((subm_id, meta))
+        return (subms, csrf)
+    def _get_submission(self, idx, csrf):
+        req = self.opener.open('https://codeforces.com/data/submitSource', urllib.parse.urlencode(
+        {
+            'submissionId': idx,
+            'csrf_token': csrf
+        }).encode('ascii'))
+        return json.loads(req.read().decode('utf-8', 'replace'))
+    def task_list(self):
+        return self._get_submit()[0]
+    def submission_list(self):
+        data = self._get_submissions()[0]
+        return [i[0] for i in data], [i[1]['status-small'].split('<a href="', 1)[1].split('"', 1)[0].rsplit('/', 1)[1] for i in data]
+    @staticmethod
+    def _format_status(st):
+        st = st.replace('_', ' ')
+        return st[:1].upper()+st[1:].lower()
+    def submission_results(self, subm_id):
+        data = self._get_submission(subm_id, self._get_submissions()[1])
+        ntests = int(data.get('testCount', 0))
+        ans = []
+        for i in range(ntests):
+            try: tc = '%.03f' % (data['timeConsumed#'+str(i+1)]/1000)
+            except KeyError: tc = ''
+            try: ans.append((self._format_status(data[i]), tc))
+            except KeyError: pass
+        return [i[0] for i in ans], [i[1] for i in ans]
+    def task_ids(self):
+        return list(range(len(self.task_list())))
+    def _submit(self, task, lang, text, csrf):
+        if isinstance(text, str): text = text.encode('utf-8')
+        data = []
+        data.append(b'"ftaa"\r\n\r\n')
+        data.append(b'"bfaa"\r\n\r\n')
+        data.append(b'"action"\r\n\r\nsubmitSolutionFormSubmitted')
+        data.append(b'"submittedProblemIndex"\r\n\r\n'+task.encode('utf-8'))
+        data.append(b'"programTypeId"\r\n\r\n'+str(lang).encode('utf-8'))
+        data.append(b'"source"\r\n\r\n'+text)
+        import random
+        while True:
+            x = b'----------'+str(random.randrange(1, 1000000000)).encode('ascii')
+            for i in data:
+                if x in i: break
+            else: break
+        data = b'\r\n'.join(b'--'+x+b'\r\n'+b'Content-Disposition: form-data; name='+i for i in data)+b'\r\n--'+x+b'--\r\n'
+        try:
+            self.opener.open(urllib.request.Request(self.base_url+'/submit?csrf_token='+csrf,
+                                data=data,
+                                headers={'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii')},
+                                method='POST'))
+        except urllib.request.URLError: pass
+    def submit(self, task, lang, text):
+        tasks, langs, csrf = self._get_submit()
+        self._submit(tasks[task], lang, text, csrf)
+    def _compile_error(self, subm_id, csrf):
+        return json.loads(self.opener.open('https://codeforces.com/data/judgeProtocol',
+            urllib.parse.urlencode({
+                'submissionId': subm_id,
+                'csrf_token': csrf
+            }).encode('ascii')).read().decode('utf-8', 'replace'))
+    def compile_error(self, subm_id):
+        return self._compile_error(subm_id, self._get_submissions()[1])

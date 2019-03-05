@@ -1,15 +1,19 @@
 from brutejudge.http import submit, task_list, task_ids, submission_list, compiler_list
 from brutejudge.error import BruteError
-import os.path
+import os.path, shlex
 
 def get_lang_id(self, lang_name, task_id):
-    lang_id = [i for i, j, k in compiler_list(self.url, self.cookie, task_ids(self.url, self.cookie)[task_id]) if j == lang_name]
+    try: task_id = task_ids(self.url, self.cookie)[task_id]
+    except IndexError: raise BruteError("No such task")
+    lang_id = [i for i, j, k in compiler_list(self.url, self.cookie, task_id) if j == lang_name]
     try: lang_id, = lang_id
-    except (IndexError, ValueError): raise BruteError("Unknown language: "+lang_name)
+    except ValueError: raise BruteError("Unknown language: "+lang_name)
     return lang_id
 
 def get_possible_lang_id(self, lang_names, task_id):
-    lang_id = [i for i, j, k in compiler_list(self.url, self.cookie, task_ids(self.url, self.cookie)[task_id]) if j in lang_names]
+    try: task_id = task_ids(self.url, self.cookie)[task_id]
+    except IndexError: raise BruteError("No such task.")
+    lang_id = [i for i, j, k in compiler_list(self.url, self.cookie, task_id) if j in lang_names]
     lang_id.append(None)
     return lang_id[0]
 
@@ -23,7 +27,7 @@ def do_asubmit(self, cmd):
     """
     modname = None
     wait = False
-    sp = cmd.split()
+    sp = shlex.split(cmd)
     if len(sp) not in range(3, 7):
         return self.do_help('asubmit')
     if sp[0] == '-w':
@@ -34,7 +38,7 @@ def do_asubmit(self, cmd):
     if sp[0] == '-x':
         modname = sp[1]
         del sp[:2]
-        if modname[:1] == '.': modname = 'brutejudge.commands.asubmit'+modname
+        if modname[:1] == '.': modname = 'brutejudge.commands.asubmit.format_'+modname[1:]
     if len(sp) != 3:
         return self.do_help('asubmit')
     tasks = task_list(self.url, self.cookie)
@@ -45,14 +49,14 @@ def do_asubmit(self, cmd):
         sp[1] = get_lang_id(self, sp[1], task_id)
     try:
         name = sp[2]
-        if not os.path.exists(name):
-            raise BruteError("File not found.")
         module = None
         ext = os.path.splitext(name)[1][1:]
         if modname == None: modname = 'brutejudge.commands.asubmit.format_'+ext
         try:
             module = __import__(modname, fromlist=True)
         except ImportError: pass
+        if not getattr(module, 'check_exists', os.path.exists)(name):
+            raise BruteError("File not found.")
         if hasattr(module, 'read_file'):
             data = module.read_file(name)
         else:
