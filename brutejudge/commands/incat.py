@@ -1,3 +1,6 @@
+import brutejudge.cheats
+from brutejudge.commands.asubmit import get_possible_lang_id
+from brutejudge.commands.astatus import still_running
 from brutejudge.commands.samples import get_samples
 from brutejudge.http import task_list, submit, submission_list, submission_status
 from brutejudge.error import BruteError
@@ -9,6 +12,7 @@ def do_incat(self, cmd):
 
     Tries to retrieve the specified ASCII file using .incbin directive.
     """
+    brutejudge.cheats.cheating(self)
     data = shlex.split(cmd)
     if len(data) not in (2, 3):
         return self.do_help('incat')
@@ -32,7 +36,7 @@ def incat(self, task, task_id, filepath, f, filter=''):
     lans = 0
     while True:
         subm1 = list(zip(*submission_list(self.url, self.cookie)))
-        submit(self.url, self.cookie, task_id, 3, r"""
+        submit(self.url, self.cookie, task_id, get_possible_lang_id(self, ('g++', 'g++-32'), task_id), r"""
 asm("included:\n.incbin \"%s\"\n.byte 0");
 
 //random: %r
@@ -55,7 +59,7 @@ int main()
         if subm2[1:] != subm1 or not subm2 or subm2[0][1] != task:
             raise BruteError("Error while sending.")
         subm_id = subm2[0][0]
-        while submission_status(self.url, self.cookie, subm_id).endswith('...'): pass
+        while still_running(submission_status(self.url, self.cookie, subm_id)): pass
         samples = get_samples(self.url, self.cookie, subm_id)
         if not samples:
             raise BruteError("No sample tests for this task.")

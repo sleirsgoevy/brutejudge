@@ -1,8 +1,15 @@
+import brutejudge.cheats
 from brutejudge.commands.incat import incat
 from brutejudge.http import task_list
 import io, shlex
 
 def do_ingrep(self, cmd):
+    """
+    usage: ingrep <task> <pattern> <filepath>
+
+    Tries to grep through the specified ASCII file using .incbin directive.
+    """
+    brutejudge.cheats.cheating(self)
     cmd = shlex.split(cmd)
     if len(cmd) != 3:
         return self.do_help('ingrep')

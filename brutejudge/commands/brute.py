@@ -1,3 +1,4 @@
+import brutejudge.cheats
 from brutejudge.http import task_list
 from brutejudge.search import Searcher
 from brutejudge.error import BruteError
@@ -8,6 +9,7 @@ def do_brute(self, cmd):
 
     Tries to retrieve the test cases using binary search.
     """
+    brutejudge.cheats.cheating(self)
     sp = cmd.split()
     if len(sp) not in range(2, 5):
         return self.do_help('brute')

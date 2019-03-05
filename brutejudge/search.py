@@ -1,3 +1,5 @@
+import brutejudge.cheats
+from brutejudge.commands.asubmit import get_possible_lang_id
 import brutejudge.http as http
 from .error import BruteError
 from .injector import Injector
@@ -23,7 +25,7 @@ class Searcher:
         def func(*args):
             print("#brute:", attr, args)
             submissions0 = http.submission_list(self.url, self.cookie)
-            http.submit(self.url, self.cookie, self.task, 23, self.injector.call(attr, *args, input_file=self.input_file, output_file=self.output_file))
+            http.submit(self.url, self.cookie, self.task, get_possible_lang_id(self, ('python3', 'pypy3'), self.task), self.injector.call(attr, *args, input_file=self.input_file, output_file=self.output_file))
             result = [[]]
             submissions = http.submission_list(self.url, self.cookie)
             if submissions == submissions0:

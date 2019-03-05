@@ -70,8 +70,8 @@ class BruteCMD(cmd.Cmd):
             for i, j in zip(*map(reversed, submission_list(self.url, self.cookie))):
                 print('%s\t\t%s'%(i, j))
         else:
-            for i, j in zip(*submission_results(self.url, self.cookie, int(cmd))):
-                print(i, j)
+            for t, (i, j) in enumerate(zip(*submission_results(self.url, self.cookie, int(cmd)))):
+                print('%3d'%t, i, j)
     def do_submit(self, cmd):
         """
         usage: submit <task> <lang_id> <file>
@@ -118,7 +118,7 @@ class BruteCMD(cmd.Cmd):
             return
         ans = status(self.url, self.cookie)
         print('Task\tStatus')
-        for k, v in sorted(list(ans.items())):
+        for k, v in list(ans.items()):
             print(k+'\t'+str(v))
     def do_scores(self, cmd):
         """
@@ -127,7 +127,7 @@ class BruteCMD(cmd.Cmd):
         Show scores for each task.
         """
         if not isspace(cmd):
-            return self.do_help('status')
+            return self.do_help('scores')
         ans = scores(self.url, self.cookie)
         print('Task\tScore')
         for k, v in ans.items():
@@ -168,8 +168,8 @@ class BruteCMD(cmd.Cmd):
         raise BruteError('No such command: ' + cmd.split()[0])
 #       return getattr(getattr(brutejudge.commands, cmd), 'do_'+cmd)(self, arg)
     def do_EOF(self, cmd=None):
-        print()
-        exit()
+        print(file=sys.stderr)
+        sys.exit(0)
     def do_python(self, cmd):
         if cmd and not cmd.isspace():
             exec(cmd)

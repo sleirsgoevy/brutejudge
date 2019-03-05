@@ -1,16 +1,34 @@
-from brutejudge.http import submit, task_list, submission_list
+from brutejudge.http import submit, task_list, task_ids, submission_list, compiler_list
 from brutejudge.error import BruteError
 import os.path
 
+def get_lang_id(self, lang_name, task_id):
+    lang_id = [i for i, j, k in compiler_list(self.url, self.cookie, task_ids(self.url, self.cookie)[task_id]) if j == lang_name]
+    try: lang_id, = lang_id
+    except (IndexError, ValueError): raise BruteError("Unknown language: "+lang_name)
+    return lang_id
+
+def get_possible_lang_id(self, lang_names, task_id):
+    lang_id = [i for i, j, k in compiler_list(self.url, self.cookie, task_ids(self.url, self.cookie)[task_id]) if j in lang_names]
+    lang_id.append(None)
+    return lang_id[0]
+
 def do_asubmit(self, cmd):
     """
-    usage: asubmit [-x <extension>] <task> <lang_id> <file>
+    usage: asubmit [-w] [-x <extension>] <task> <lang_id> <file>
 
     Submit a new solution, using style-fixed version.
     Uses a specific style fixer if -x is specified.
+    Waits until testing ends if -w is specified.
     """
     modname = None
+    wait = False
     sp = cmd.split()
+    if len(sp) not in range(3, 7):
+        return self.do_help('asubmit')
+    if sp[0] == '-w':
+        wait = True
+        del sp[0]
     if len(sp) not in (3, 5):
         return self.do_help('asubmit')
     if sp[0] == '-x':
@@ -24,7 +42,7 @@ def do_asubmit(self, cmd):
     except ValueError:
         raise BruteError("No such task.")
     if not sp[1].isnumeric():
-        raise BruteError("lang_id must be a number")
+        sp[1] = get_lang_id(self, sp[1], task_id)
     try:
         name = sp[2]
         if not os.path.exists(name):
@@ -51,3 +69,4 @@ def do_asubmit(self, cmd):
         raise BruteError("Error while sending.")
     else:
         print('Submission ID is', after[0])
+        if wait: self.do_astatus(str(after[0]))

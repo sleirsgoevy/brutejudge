@@ -1,3 +1,4 @@
+import brutejudge.cheats
 from brutejudge.http import contest_name
 from concurrent.futures import ThreadPoolExecutor
 
@@ -8,6 +9,7 @@ def do_contests(self, cmd):
     Get all contest names from login page <url>.
     `thread_num` defaults to 16.
     """
+    brutejudge.cheats.cheating(self)
     if not cmd or cmd.isspace():
         return self.do_help('contests')
     cmd = cmd.split(' ')

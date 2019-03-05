@@ -1,3 +1,5 @@
+import brutejudge.cheats
+
 injected = """\
 import sys
 

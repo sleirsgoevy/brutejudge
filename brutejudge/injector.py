@@ -1,3 +1,4 @@
+import brutejudge.cheats
 from .injected import injected
 
 class Injector:

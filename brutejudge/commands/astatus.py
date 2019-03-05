@@ -2,6 +2,9 @@ import sys
 from brutejudge.http import submission_status
 from brutejudge.error import BruteError
 
+def still_running(s):
+    return s.endswith('...') or ', ' in s or s in ('Compiling', 'Running', 'Judging')
+
 def do_astatus(self, cmd):
     """
     usage: astatus <subm_id>
@@ -21,9 +24,10 @@ def do_astatus(self, cmd):
         cur = cur.strip()
         sys.stderr.write(' '*len(prev)+'\r')
         sys.stderr.flush()
-        if cur.endswith('...'):
-            prev = cur + ' ' + chars[idx]
+        if still_running(cur):
+            prev = '%%%ds' % len(prev) % (cur + ' ' + chars[idx])
             idx = (idx + 1) % 4
+#           print(prev)
             sys.stderr.write(prev+'\r')
             sys.stderr.flush()
         else:

@@ -1,0 +1,109 @@
+import collections
+from .libpcms import PCMS as LPCMS
+from brutejudge.error import BruteError
+
+class PCMS:
+    def __init__(self, url, login, password):
+        try: self.pcms = LPCMS(url, (login, password))
+        except AssertionError as e: raise BruteError(str(e))
+        self._subms = []
+        self._subms_set = set()
+        self.submission_list()
+    @staticmethod
+    def _remove_tags(t):
+        t = t.split('<')
+        return t[0] + ''.join(i.split('>', 1)[-1] for i in t[1:])
+    def task_list(self):
+        try: return self.pcms.get_submit()[0]
+        except: raise BruteError("Failed to fetch task list.")
+    def submission_list(self):
+        x = self.pcms.get_submissions()
+        data = []
+        for t, (k, v) in enumerate(sorted(x.items(), key=lambda x:x[0])):
+            for i in v:
+                data.append((int(i[1]['time'].replace(':', '')), int(i[1]['attempt']), int(i[1]['attempt']) * len(x) + t, k))
+        data.sort()
+        for _, _, i, j in data:
+            if i not in self._subms_set:
+                self._subms_set.add(i)
+                self._subms.append((i, j))
+        a = []
+        b = []
+        for i, j in reversed(self._subms):
+            a.append(i)
+            b.append(j)
+        return (a, b)
+    def _decode_subm_id(self, subm_id):
+        subm_id = int(subm_id)
+        tasks = self.task_list()
+        attempt, taskid = divmod(subm_id, len(tasks))
+        task = tasks[taskid]
+        return (task, attempt)
+    def submission_results(self, subm_id):
+        task, attempt = self._decode_subm_id(subm_id)
+        proto = self.pcms.get_protocol(task, attempt)
+        outcomes = []
+        times = []
+        if proto == None:
+            raise BruteError("Failed to fetch testing protocol.")
+        for i in proto:
+            if 'outcome' not in i[1]: continue
+            outcomes.append(self._remove_tags(i[1]['outcome']))
+            if outcomes[-1] == 'Accepted': outcomes[-1] = 'OK'
+            try:
+                t = int(i[1]['time'].split()[0])
+                times.append(str(t / 1000))
+            except KeyError: times.append('')
+        return (outcomes, times)
+    def task_ids(self):
+        return list(range(len(self.task_list())))
+    def submit(self, taskid, lang, text):
+        tasks, langs, exts, vs = self.pcms.get_submit()
+        task = tasks[taskid]
+        lang = [j for i, j, k in self.compiler_list(taskid) if i == lang][0]
+        if isinstance(text, str):
+            text = text.encode('utf-8')
+        try: self.pcms.submit(task, lang, text, vs, {i[lang] for i in exts.values() if lang in i}.pop())
+        except AssertionError: pass
+    def status(self):
+        x = self.pcms.get_submissions()
+        ans = collections.OrderedDict()
+        for k, v in x.items():
+            if v:
+                ans[k] = self._remove_tags(v[-1][1]['outcome']) if 'outcome' in v[-1][1] else None
+            else:
+                ans[k] = None
+        return ans
+    def scores(self):
+        x = self.pcms.get_submissions(False)
+        ans = {}
+        for k, v in x.items():
+            notnone = False
+            for i in v:
+                if i[0].startswith('run '):
+                    notnone = True
+                    ans[k] = ans.get(k, 0)
+                if i[0] == 'always' and 'head total-score' in i[1]:
+                    ans[k] = int(i[1]['head total-score'].split('<span>Score =', 1)[1].split('</span>', 1)[0])
+            if not notnone: ans[k] = None
+        return ans
+    def compile_error(self, subm_id):
+        task, attempt = self._decode_subm_id(subm_id)
+        ans = self.pcms.get_compile_error(task, attempt)
+        if ans == None: raise IndexError
+        return ans
+    def submission_status(self, subm_id):
+        task, attempt = self._decode_subm_id(subm_id)
+        subms = self.pcms.get_submissions()
+        for i in subms[task]:
+            if 'attempt' in i[1] and int(i[1]['attempt']) == attempt:
+                return self._remove_tags(i[1]['outcome']) if 'outcome' in i[1] else None
+        return None
+    def submission_source(self, subm_id):
+        task, attempt = self._decode_subm_id(subm_id)
+        return self.pcms.get_source(task, attempt)
+    def compiler_list(self, task_id):
+        tasks, langs, jp, vs = self.pcms.get_submit()
+        return [(i + 1, j, k) for i, (j, k) in enumerate(sorted(langs.items())) if j in jp[tasks[task_id]]]
+    def do_action(self, *args):
+        raise BruteError("Not implemented on PCMS")
