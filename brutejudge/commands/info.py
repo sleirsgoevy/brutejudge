@@ -1,4 +1,5 @@
 from brutejudge.http import task_list, task_ids, problem_info
+from brutejudge.error import BruteError
 
 def do_info(self, cmd):
     """

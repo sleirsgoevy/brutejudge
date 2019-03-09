@@ -35,7 +35,7 @@ class JJS:
         return [0]
     def submit(self, taskid, lang, text):
         if isinstance(text, str): text = text.encode('utf-8')
-        code, headers, data = json_req(self.url+"/submission/send", {'toolchain': lang, 'code': list(text)}, {"X-JJS-Auth": self.cookie})
+        code, headers, data = json_req(self.url+"/submissions/send", {'toolchain': lang, 'code': list(text)}, {"X-JJS-Auth": self.cookie})
 #       print(code, headers, data)
     def compiler_list(self, task):
         code, headers, data = json_req(self.url+"/toolchains/list", None, {"X-JJS-Auth": self.cookie})

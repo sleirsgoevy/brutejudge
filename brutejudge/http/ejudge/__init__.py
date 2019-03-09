@@ -305,7 +305,7 @@ class Ejudge:
                 ans += '[['+html.escape(urllib.parse.urljoin(self.urls['submission'].format(prob_id=id), href))+' | '+i
             elif i.startswith('li>'):
                 ans += '* ' + i.split('>', 1)[1]
-            elif any(i.startswith(x) for x in ('br/>', '/h1>', '/h2>', '/h3>', '/p>', '/li>')):
+            elif any(i.startswith(x) for x in ('br/>', '/h1>', '/h2>', '/h3>', '/p>', '/li>', '/div>')):
                 ans += '\n' + i.split('>', 1)[1]
             elif i.startswith('/a>'):
                 ans += ']]'+i.split('>', 1)[1]

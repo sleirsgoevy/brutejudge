@@ -14,6 +14,7 @@ class CodeForces:
         if url.find('/contest') == url.find('/contests'):
             url = '/contest'.join(url.split('/contests', 1))
         self.base_url = url
+        self.handle = login
         host = url.split('/')[2]
         self.opener = OpenerWrapper(urllib.request.build_opener(urllib.request.HTTPCookieProcessor))
         csrf = self._get_csrf(self.opener.open('https://%s/enter?back=%%2F'%host).read().decode('utf-8', 'replace'))
@@ -75,16 +76,24 @@ class CodeForces:
         return [i[0] for i in data], [i[1]['status-small'].split('<a href="', 1)[1].split('"', 1)[0].rsplit('/', 1)[1] for i in data]
     @staticmethod
     def _format_status(st):
+        if st == 'OK': return 'OK'
         st = st.replace('_', ' ')
         return st[:1].upper()+st[1:].lower()
+    @staticmethod
+    def _format_total_status(st):
+        v = st.split('<')
+        v = v[0]+''.join(i.split('>', 1)[1] for i in v[1:])
+        v = v.split(' on test ', 1)[0]
+        v = v.split(' on pretest ', 1)[0]
+        return v.strip()
     def submission_results(self, subm_id):
         data = self._get_submission(subm_id, self._get_submissions()[1])
         ntests = int(data.get('testCount', 0))
         ans = []
         for i in range(ntests):
-            try: tc = '%.03f' % (data['timeConsumed#'+str(i+1)]/1000)
+            try: tc = '%.03f' % (int(float(data['timeConsumed#'+str(i+1)]))/1000)
             except KeyError: tc = ''
-            try: ans.append((self._format_status(data[i]), tc))
+            try: ans.append((self._format_status(data['verdict#'+str(i+1)]), tc))
             except KeyError: pass
         return [i[0] for i in ans], [i[1] for i in ans]
     def task_ids(self):
@@ -114,6 +123,30 @@ class CodeForces:
     def submit(self, task, lang, text):
         tasks, langs, csrf = self._get_submit()
         self._submit(tasks[task], lang, text, csrf)
+    def status(self):
+        subms = self._get_submissions()[0]
+        ans = {i: None for i in self.task_list()}
+        for i, j in subms:
+            task = j['status-small'].split('<a href="', 1)[1].split('"', 1)[0].rsplit('/', 1)[1]
+            status = self._format_total_status(j['status-cell status-small status-verdict-cell'].split('>', 1)[1])
+            if status in ('Accepted', 'Pretests passed'): status = 'OK'
+            if ans.get(task, None) == None or status == 'OK': ans[task] = status
+        return ans
+    def scores(self):
+        data = self.opener.open(self.base_url+'/standings').read().decode('utf-8', 'replace')
+        tasks = (i.split('href="/contest/', 1)[1].split('"', 1)[0].rsplit('/', 1)[1] for i in data.split('<th ')[5:])
+        for i in data.split('<tr participantId="')[1:]:
+            i = i.split('</tr>', 1)[0]
+            handle = i.split('<a href="/profile/', 1)[1].split('"', 1)[0]
+            if handle != self.handle: continue
+            ans = {}
+            for j in i.split('<td\r\n'+' '*16+'problemId="')[1:]:
+                j = j.split('<span class="cell-', 1)[1].split('>', 1)[1].split('</span>', 1)[0]
+                try: j = int(j)
+                except ValueError: j = -1
+                ans[next(tasks)] = j if j >= 0 else None
+            return ans
+        return {}
     def _compile_error(self, subm_id, csrf):
         return json.loads(self.opener.open('https://codeforces.com/data/judgeProtocol',
             urllib.parse.urlencode({
@@ -122,3 +155,61 @@ class CodeForces:
             }).encode('ascii')).read().decode('utf-8', 'replace'))
     def compile_error(self, subm_id):
         return self._compile_error(subm_id, self._get_submissions()[1])
+    def submission_status(self, subm_id):
+        subm = self._get_submission(subm_id, self._get_submissions()[1])
+        return self._format_total_status(subm.get('verdict', ''))
+    def submission_source(self, subm_id):
+        subm = self._get_submission(subm_id, self._get_submissions()[1])
+        if 'source' in subm: return subm['source'].encode('utf-8')
+    def compiler_list(self, prob_id):
+        return self._get_submit()[1]
+    def submission_stats(self, subm_id):
+        subm = self._get_submission(subm_id, self._get_submissions()[1])
+        ans = {}
+        if 'testCount' in subm and subm['testCount'] and int(subm['testCount']) != 0:
+            ntests = int(subm['testCount'])
+            ans['tests'] = {'total': ntests}
+            success = 0
+            for i in range(ntests):
+                if ans.get('verdict#'+str(i+1), None) == 'OK':
+                    success += 1
+            ans['success'] = success
+            ans['fail'] = ntests - success
+        return (ans, None)
+    def problem_info(self, prob_id):
+        task = self.task_list()[prob_id]
+        data = self.opener.open(self.base_url+'/problem/'+task).read().decode('utf-8', 'replace')
+        data = data.split('<div class="property-title">', 1)[1].split('</div><div>', 1)[1]
+        data = data.split('<script type="text/javascript">', 1)[0].split('<')
+        ans = data[0]
+        for i in data[1:]:
+            if i.startswith('a href="'):
+                href, i = i[8:].split('">', 1)
+                dload_prefix = self.urls['download_file'].format(prob_id=id, filename='')
+                href = html.unescape(href)
+                if href.startswith(dload_prefix):
+                    href = 'file '+href[len(dload_prefix):]
+                ans += '[['+html.escape(urllib.parse.urljoin(self.urls['submission'].format(prob_id=id), href))+' | '+i
+            elif i.startswith('li>'):
+                ans += '* ' + i.split('>', 1)[1]
+            elif any(i.startswith(x) for x in ('br/>', '/h1>', '/h2>', '/h3>', '/p>', '/li>', '/div>')):
+                ans += '\n' + i.split('>', 1)[1]
+            elif i.startswith('/a>'):
+                ans += ']]'+i.split('>', 1)[1]
+            else:
+                ans += i.split('>', 1)[1]
+        return ({}, html.unescape(ans.strip()))
+    def download_file(self, *args):
+        raise BruteError("File download doesn't exist on CodeForces")
+    def submission_score(self, subm_id):
+        scores = self.scores()
+        subms = list(zip(*self.submission_list()))
+        st = self.submission_status(subm_id)
+        if st == 'OK':
+            return scores[[i[1] for i in subms if i[0] == subm_id][0]]
+    def clars(self):
+        raise BruteError("Clarifications don't exits on CodeForces")
+    def submit_clar(self, *args):
+        raise BruteError("Clarifications don't exits on CodeForces")
+    def read_clar(self, id):
+        raise BruteError("Clarifications don't exits on CodeForces")
