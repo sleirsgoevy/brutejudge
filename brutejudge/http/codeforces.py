@@ -213,3 +213,19 @@ class CodeForces:
         raise BruteError("Clarifications don't exits on CodeForces")
     def read_clar(self, id):
         raise BruteError("Clarifications don't exits on CodeForces")
+    def get_samples(self, subm_id):
+        subm = self._get_submission(subm_id, self._get_submissions()[1])
+        ans = []
+        for i in range(int(subm.get('testCount', '0'))):
+            cur = {}
+            suf = '#%d'%(i+1)
+            if 'input'+suf in subm:
+                cur['Input'] = subm['input'+suf]
+            if 'output'+suf in subm:
+                cur['Output'] = subm['output'+suf]
+            if 'answer'+suf in subm:
+                cur['Correct'] = subm['answer'+suf]
+            if 'checkerStdoutAndStderr'+suf in subm:
+                cur['Checker output'] = subm['checkerStdoutAndStderr'+suf]
+            ans.append(cur)
+        return {i + 1: j for i, j in enumerate(ans)}

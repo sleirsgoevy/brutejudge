@@ -73,6 +73,9 @@ def incat(self, task, task_id, filepath, f, filter='', custom_include=None):
         sys.stderr.write('\b'+rot_str[idx])
         sys.stderr.flush()
         include_code = ('.incbin \\"%s\\"\\n' if custom_include == None else custom_include) % filepath
+        cerr_output = r"""
+    if(%d < included_s.size())
+        cerr << included_s.substr(%d, 65536);"""%(lans + 65536, lans + 65536)
         submit(self.url, self.cookie, task_id, get_possible_lang_id(self, ('g++', 'g++-32'), task_id), r"""
 asm("included:\n%s.byte 0\nincluded_length:\n.long included_length-included-1");
 
@@ -90,11 +93,9 @@ int main()
     string included_s(included, included_length);
     %sif(%d < included_s.size())
         %s << included_s.substr(%d, 65536);
-    if(%d < included_s.size())
-        cerr << included_s.substr(%d, 65536);
-    return 0;
+%s    return 0;
 }
-"""%(include_code, random.random(), (filter.strip()+'\n').replace('\n', '\n    '), lans, 'ifstream("%s")'%self.input_file if hasattr(self, 'input_file') else 'cout', lans, lans + 65536, lans + 65536))
+"""%(include_code, random.random(), (filter.strip()+'\n').replace('\n', '\n    '), lans, 'ifstream("%s")'%self.input_file if hasattr(self, 'input_file') else 'cout', lans, cerr_output if not isinstance(self.url, CodeForces) else ''))
         idx = (idx + 1) % 4
         sys.stderr.write('\b'+rot_str[idx])
         sys.stderr.flush()
