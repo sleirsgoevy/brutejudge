@@ -1,5 +1,6 @@
 import ssl, socket, html, collections, urllib.parse
 import brutejudge.http.ejudge.ej371, brutejudge.http.ejudge.ej373
+from brutejudge.http.base import Backend
 from brutejudge.error import BruteError
 
 def do_http(url, method, headers, data=b''):
@@ -102,11 +103,12 @@ def contest_name(url):
     try: return html.unescape(data.decode('utf-8', 'replace').split('<title>', 1)[1].split(' [', 1)[1].split(']</title>', 1)[-2])
     except IndexError: return None
 
-class Ejudge:
+class Ejudge(Backend):
     @staticmethod
     def detect(url):
         return url.startswith('http://') or url.startswith('https://')
     def __init__(self, url, login, password):
+        Backend.__init__(self)
         url = url.replace('/new-register?', '/new-client?')
         contest_id = url.split("contest_id=")[1].split("&")[0]
         self.contest_id = int(contest_id)
@@ -124,8 +126,15 @@ class Ejudge:
             raise BruteError("Unknown ejudge version.")
         self.urls = urls
         self.cookie = rhd["Set-Cookie"].split(";")[0]
+        self._get_cache = {}
+    def _cache_get(self, url):
+        if url in self._get_cache:
+            return self._get_cache[url]
+        ans = get(url, {'Cookie': self.cookie})
+        if self.caching: self._get_cache[url] = ans
+        return ans
     def task_list(self):
-        code, headers, data = get(self.urls['summary'], {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['summary'])
         if code != 200:
             raise BruteError("Failed to fetch task list.")
         column_count = data.count(b'<th ')
@@ -134,7 +143,7 @@ class Ejudge:
         data = [x.split("</td>")[0] for x in splitted]
         return data[::column_count]
     def submission_list(self):
-        code, headers, data = get(self.urls['submissions'], {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['submissions'])
         if code != 200:
             raise BruteError("Failed to fetch submission list.")
         ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8').split('<th class="b1">')[1:]]
@@ -144,7 +153,7 @@ class Ejudge:
         data = [x.split("</td>")[0] for x in splitted]
         return list(map(lambda x:(int(x[:-1]) if x[-1:] == '#' else int(x)), data[ths.index('Run ID')::w])), data[ths.index('Problem')::w]
     def submission_results(self, id):
-        code, headers, data = get(self.urls['protocol'].format(run_id=id), {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['protocol'].format(run_id=id))
         if code != 200:
             raise BruteError("Failed to fetch testing protocol.")
         w = data.count(b'<th ')
@@ -153,7 +162,7 @@ class Ejudge:
         data = [x.split("</td>")[0] for x in splitted]
         return [i[:-7].split('>')[-1] for i in data[1::w]], list(map(html.unescape, data[2::w]))
     def task_ids(self):
-        code, headers, data = get(self.urls['summary'], {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['summary'])
         if code != 200:
             raise BruteError("Failed to fetch task list.")
         try:
@@ -188,7 +197,7 @@ class Ejudge:
         data = b'\r\n'.join(b'--'+x+b'\r\nContent-Disposition: form-data; name='+i for i in data)+b'\r\n--'+x+b'--\r\n'
         return post(url, data, {'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii'), 'Cookie': self.cookie})
     def status(self):
-        code, headers, data = get(self.urls['summary'], {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['summary'])
         if code != 200:
             raise BruteError("Failed to fetch task list")
         ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8').split('<th class="b1">')[1:]]
@@ -199,7 +208,7 @@ class Ejudge:
         idx = ths.index('Status')
         return collections.OrderedDict((a, b if b != '&nbsp;' else None) for a, b in zip(data[ths.index('Short name')::w], data[idx::w]))
     def scores(self):
-        code, headers, data = get(self.urls['summary'], {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['summary'])
         if code != 200:
             raise BruteError("Failed to fetch task list")
         ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8').split('<th class="b1">')[1:]]
@@ -209,7 +218,7 @@ class Ejudge:
         if 'Score' not in ths: return {}
         return collections.OrderedDict(zip(data[ths.index('Short name')::w], [None if x == '&nbsp;' else int(x) for x in data[ths.index('Score')::w]]))
     def compile_error(self, id):
-        code, headers, data = get(self.urls['protocol'].format(run_id=id), {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['protocol'].format(run_id=id))
         if code != 200:
             raise BruteError("Failed to fetch testing protocol.")
         splitted = data.decode('utf-8').split('<pre>')[1:]
@@ -222,7 +231,7 @@ class Ejudge:
             ans.append(html.unescape(i))
         return '\n'.join(ans)
     def submission_status(self, id):
-        code, headers, data = get(self.urls['submissions'], {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['submissions'])
         if code != 200:
             raise BruteError("Failed to fetch submission list.")
         ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8').split('<th class="b1">')[1:]]
@@ -233,16 +242,16 @@ class Ejudge:
         for i, j in zip(map(lambda x:(int(x[:-1]) if x[-1:] == '#' else int(x)), data[ths.index('Run ID')::w]), data[ths.index('Result')::w]):
             if i == id: return j
     def submission_source(self, id):
-        code, headers, data = get(self.urls['source'].format(run_id=id), {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['source'].format(run_id=id))
         rhd = dict(headers)
         if code != 200 or 'html' in rhd['Content-Type']:
             return None
         return data
     def do_action(self, name, need_code, fail_pattern=None):
-        code, headers, data = get(self.urls[name], {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls[name])
         return code == need_code and (fail_pattern == None or fail_pattern not in data)
     def compiler_list(self, prob_id):
-        code, headers, data = get(self.urls['submission'].format(prob_id=prob_id), {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['submission'].format(prob_id=prob_id))
         data = data.decode('utf-8')
         if '<input type="hidden" name="lang_id" value="' in data:
             data = data.split('<input type="hidden" name="lang_id" value="', 1)[1]
@@ -262,7 +271,7 @@ class Ejudge:
             ans.append((int(a), b.strip(), c.strip()))
         return ans
     def submission_stats(self, id):
-        code, headers, data = get(self.urls['protocol'].format(run_id=id), {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['protocol'].format(run_id=id))
         data = data.decode('utf-8')
         if '<big>' in data:
             data = '\n\n'.join(i.split('</big>', 1)[0] for i in data.split('<big>')[1:]).split('<')
@@ -281,7 +290,7 @@ class Ejudge:
         else:
             return ({}, None)
     def problem_info(self, id):
-        code, headers, data = get(self.urls['submission'].format(prob_id=id), {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['submission'].format(prob_id=id))
         data = data.decode('utf-8')
         if '<table class="line-table-wb">' not in data: return ({}, None)
         data = data.split('<table class="line-table-wb">', 1)[1]
@@ -313,14 +322,14 @@ class Ejudge:
                 ans += i.split('>', 1)[1]
         return (stats, html.unescape(ans.strip()))
     def download_file(self, prob_id, filename):
-        code, headers, data = get(self.urls['download_file'].format(prob_id=prob_id, filename=filename), {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['download_file'].format(prob_id=prob_id, filename=filename))
         if code == 404:
             raise BruteError("File not found.")
         elif code != 200:
             raise BruteError("Error downloading.")
         return data
     def submission_score(self, id):
-        code, headers, data = get(self.urls['submissions'], {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['submissions'])
         if code != 200:
             raise BruteError("Failed to fetch submission list.")
         ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8').split('<th class="b1">')[1:]]
@@ -335,7 +344,7 @@ class Ejudge:
                 if (j+' ').isspace(): return None
                 return int(j)
     def clars(self):
-        code, headers, data = get(self.urls['clars'], {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['clars'])
         ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8').split('<th class="b1">')[1:]]
         w = len(ths)
         splitted = data.decode('utf-8').split('<td class="b1">')[1:]
@@ -345,7 +354,7 @@ class Ejudge:
         if post(self.urls['submit'], {'SID': self.urls['sid'], 'prob_id': task, 'subject': subject, 'text': text, 'action_41': 'Send!'}, {'Cookie': self.cookie})[0] != 302:
             raise BruteError("Failed to submit clar")
     def read_clar(self, id):
-        code, headers, data = get(self.urls['read_clar'].format(clar_id=id), {'Cookie': self.cookie})
+        code, headers, data = self._cache_get(self.urls['read_clar'].format(clar_id=id))
         data = html.unescape(data.decode('utf-8').split('<pre class="message">', 1)[1].split('</pre>', 1)[0])
         return data.split('\n', 2)[2]
     def get_samples(self, subm_id):
@@ -374,3 +383,5 @@ class Ejudge:
                 data = data[1:]
                 curr[what] = data
         return tests
+    def stop_caching(self):
+        self._get_cache.clear()

@@ -1,5 +1,6 @@
 import urllib.request, urllib.parse, json, collections, html
 from .ejudge import Ejudge
+from .base import Backend
 from .openerwr import OpenerWrapper
 from ..error import BruteError
 
@@ -16,6 +17,7 @@ class Informatics(Ejudge):
                         return True
         return False
     def __init__(self, url, login, password):
+        Backend.__init__(self)
         for proto in ('http', 'https'):
             for domain in ('mccme', 'msk'):
                 if (url+'/').startswith('%s://informatics.%s.ru/'%(proto, domain)):

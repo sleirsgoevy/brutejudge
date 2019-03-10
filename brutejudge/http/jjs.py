@@ -1,5 +1,6 @@
 import json
 from brutejudge.error import BruteError
+from brutejudge.http.base import Backend
 from brutejudge.http.ejudge import do_http, get, post
 
 def json_req(url, data, headers={}):
@@ -10,12 +11,13 @@ def json_req(url, data, headers={}):
     try: return (code, headers, json.loads(data.decode('utf-8')))
     except json.JSONDecodeError: return (code, headers, None)
 
-class JJS:
+class JJS(Backend):
     @staticmethod
     def detect(url):
         sp = url.split('/')
         return sp[0] in ('http:', 'https:') and not sp[1] and sp[2].endswith(':1779')
     def __init__(self, url, login, password):
+        Backend.__init__(self)
         code, headers, data = json_req(url+'/auth/simple', {"login": login, "password": password})
 #       print(url, code, headers, data)
         if not data or 'Ok' not in data:

@@ -1,12 +1,14 @@
 import collections
 from .libpcms import PCMS as LPCMS
+from brutejudge.http.base import Backend
 from brutejudge.error import BruteError
 
-class PCMS:
+class PCMS(Backend):
     @staticmethod
     def detect(url):
         return LPCMS.detect(url)
     def __init__(self, url, login, password):
+        Backend.__init__(self)
         try: self.pcms = LPCMS(url, (login, password))
         except AssertionError as e: raise BruteError(str(e))
         self._subms = []

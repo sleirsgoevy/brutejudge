@@ -1,8 +1,9 @@
 import urllib.request, urllib.parse, html, json
+from brutejudge.http.base import Backend
 from brutejudge.error import BruteError
 from brutejudge.http.openerwr import OpenerWrapper
 
-class CodeForces:
+class CodeForces(Backend):
     @staticmethod
     def detect(url):
         url = url.split('/')
@@ -11,6 +12,7 @@ class CodeForces:
     def _get_csrf(data):
         return data.split('<meta name="X-Csrf-Token" content="', 1)[1].split('"', 1)[0]
     def __init__(self, url, login, password):
+        Backend.__init__(self)
         if url.find('/contest') == url.find('/contests'):
             url = '/contest'.join(url.split('/contests', 1))
         self.base_url = url
@@ -28,6 +30,8 @@ class CodeForces:
         }).encode('ascii'))
         if ln.geturl() != 'https://%s/'%host:
             raise BruteError("Login failed.")
+        self._gs_cache = None
+        self._subms_cache = {}
     def _get_submit(self):
         data = self.opener.open(self.base_url+'/submit')
         if data.geturl() != self.base_url+'/submit':
@@ -44,6 +48,7 @@ class CodeForces:
             langs_ans.append((i, short_codes.get(i, str(i)), j))
         return (tasks, langs_ans, csrf)
     def _get_submissions(self):
+        if self._gs_cache != None: return self._gs_cache
         data = self.opener.open(self.base_url+'/my')
         if data.geturl() != self.base_url+'/my':
             raise BruteError("Failed to fetch submission list")
@@ -61,14 +66,19 @@ class CodeForces:
                 data = j.split('>', 1)[1].split('</td>', 1)[0]
                 meta[cls] = data
             subms.append((subm_id, meta))
-        return (subms, csrf)
+        ans = (subms, csrf)
+        if self.caching: self._gs_cache = ans
+        return ans
     def _get_submission(self, idx, csrf):
+        if idx in self._subms_cache: return self._subms_cache[idx]
         req = self.opener.open('https://codeforces.com/data/submitSource', urllib.parse.urlencode(
         {
             'submissionId': idx,
             'csrf_token': csrf
         }).encode('ascii'))
-        return json.loads(req.read().decode('utf-8', 'replace'))
+        ans = json.loads(req.read().decode('utf-8', 'replace'))
+        if self.caching: self._subms_cache[idx] = ans
+        return ans
     def task_list(self):
         return self._get_submit()[0]
     def submission_list(self):
@@ -129,6 +139,7 @@ class CodeForces:
         for i, j in subms:
             task = j['status-small'].split('<a href="', 1)[1].split('"', 1)[0].rsplit('/', 1)[1]
             status = self._format_total_status(j['status-cell status-small status-verdict-cell'].split('>', 1)[1])
+            print(repr(status))
             if status in ('Accepted', 'Pretests passed'): status = 'OK'
             if ans.get(task, None) == None or status == 'OK': ans[task] = status
         return ans
@@ -229,3 +240,6 @@ class CodeForces:
                 cur['Checker output'] = subm['checkerStdoutAndStderr'+suf]
             ans.append(cur)
         return {i + 1: j for i, j in enumerate(ans)}
+    def stop_caching(self):
+        self._gs_cache = None
+        self._subms_cache.clear()
