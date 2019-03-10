@@ -31,6 +31,7 @@ class CodeForces(Backend):
         if ln.geturl() != 'https://%s/'%host:
             raise BruteError("Login failed.")
         self._gs_cache = None
+        self._st_cache = None
         self._subms_cache = {}
     def _get_submit(self):
         data = self.opener.open(self.base_url+'/submit')
@@ -139,12 +140,14 @@ class CodeForces(Backend):
         for i, j in subms:
             task = j['status-small'].split('<a href="', 1)[1].split('"', 1)[0].rsplit('/', 1)[1]
             status = self._format_total_status(j['status-cell status-small status-verdict-cell'].split('>', 1)[1])
-            print(repr(status))
             if status in ('Accepted', 'Pretests passed'): status = 'OK'
             if ans.get(task, None) == None or status == 'OK': ans[task] = status
         return ans
     def scores(self):
-        data = self.opener.open(self.base_url+'/standings').read().decode('utf-8', 'replace')
+        if self._st_cache != None: data = self._st_cache
+        else:
+            data = self.opener.open(self.base_url+'/standings').read().decode('utf-8', 'replace')
+            if self.caching: self._st_cache = data
         tasks = (i.split('href="/contest/', 1)[1].split('"', 1)[0].rsplit('/', 1)[1] for i in data.split('<th ')[5:])
         for i in data.split('<tr participantId="')[1:]:
             i = i.split('</tr>', 1)[0]
@@ -167,8 +170,11 @@ class CodeForces(Backend):
     def compile_error(self, subm_id):
         return self._compile_error(subm_id, self._get_submissions()[1])
     def submission_status(self, subm_id):
-        subm = self._get_submission(subm_id, self._get_submissions()[1])
-        return self._format_total_status(subm.get('verdict', ''))
+#       subm = self._get_submission(subm_id, self._get_submissions()[1])
+#       return self._format_total_status(subm.get('verdict', ''))
+        for i, j in self._get_submissions()[0]:
+            if i == subm_id:
+                return self._format_total_status(j['status-cell status-small status-verdict-cell'].split('>', 1)[1])
     def submission_source(self, subm_id):
         subm = self._get_submission(subm_id, self._get_submissions()[1])
         if 'source' in subm: return subm['source'].encode('utf-8')
@@ -242,4 +248,5 @@ class CodeForces(Backend):
         return {i + 1: j for i, j in enumerate(ans)}
     def stop_caching(self):
         self._gs_cache = None
+        self._st_cache = None
         self._subms_cache.clear()
