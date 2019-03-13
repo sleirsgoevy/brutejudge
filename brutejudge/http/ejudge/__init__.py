@@ -128,10 +128,12 @@ class Ejudge(Backend):
         self.cookie = rhd["Set-Cookie"].split(";")[0]
         self._get_cache = {}
     def _cache_get(self, url):
-        if url in self._get_cache:
-            return self._get_cache[url]
+        with self.cache_lock:
+            if url in self._get_cache:
+                return self._get_cache[url]
         ans = get(url, {'Cookie': self.cookie})
-        if self.caching: self._get_cache[url] = ans
+        with self.cache_lock:
+            if self.caching: self._get_cache[url] = ans
         return ans
     def task_list(self):
         code, headers, data = self._cache_get(self.urls['summary'])

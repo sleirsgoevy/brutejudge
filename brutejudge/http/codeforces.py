@@ -49,7 +49,8 @@ class CodeForces(Backend):
             langs_ans.append((i, short_codes.get(i, str(i)), j))
         return (tasks, langs_ans, csrf)
     def _get_submissions(self):
-        if self._gs_cache != None: return self._gs_cache
+        with self.cache_lock:
+            if self._gs_cache != None: return self._gs_cache
         data = self.opener.open(self.base_url+'/my')
         if data.geturl() != self.base_url+'/my':
             raise BruteError("Failed to fetch submission list")
@@ -68,7 +69,8 @@ class CodeForces(Backend):
                 meta[cls] = data
             subms.append((subm_id, meta))
         ans = (subms, csrf)
-        if self.caching: self._gs_cache = ans
+        with self.cache_lock:
+            if self.caching: self._gs_cache = ans
         return ans
     def _get_submission(self, idx, csrf):
         if idx in self._subms_cache: return self._subms_cache[idx]
@@ -144,10 +146,11 @@ class CodeForces(Backend):
             if ans.get(task, None) == None or status == 'OK': ans[task] = status
         return ans
     def scores(self):
-        if self._st_cache != None: data = self._st_cache
-        else:
+        with self.cache_lock: data = self._st_cache
+        if data == None:
             data = self.opener.open(self.base_url+'/standings').read().decode('utf-8', 'replace')
-            if self.caching: self._st_cache = data
+            with self.cache_lock:
+                if self.caching: self._st_cache = data
         tasks = (i.split('href="/contest/', 1)[1].split('"', 1)[0].rsplit('/', 1)[1] for i in data.split('<th ')[5:])
         for i in data.split('<tr participantId="')[1:]:
             i = i.split('</tr>', 1)[0]
