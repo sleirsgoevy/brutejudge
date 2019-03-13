@@ -122,10 +122,12 @@ def dump_contest(self, path, task, contest_id, options):
         tests_path = 'problems/%s/tests'
         checker_path = 'problems/%s/check'
         statement_path = 'problems/%s/statement.xml'
+        attachment_path = 'problems/%s/attachments/%s'
     else:
         tests_path = 'tests/%s'
         checker_path = 'checkers/check_%s'
         statement_path = 'statements/%s.xml'
+        attachment_path = 'attachments/%s/%s'
     problems = {}
     for i in serve_cfg_fmt.split('\n[problem]\n')[1:]:
         data = {}
@@ -197,16 +199,27 @@ def dump_contest(self, path, task, contest_id, options):
                     print('Warning: task', k, 'has no tests!')
                 else:
                     print(low - 1, 'tests dumped.')
-    if '--statements' in options:
+    if '--statements' in options or '--attachments' in options:
         for k, v in problems.items():
             if 'abstract' not in v:
                 print('Fetching statements for task %s...'%k)
                 try: data = easy_incat(self, task, '/home/judges/%06d/%s'%(contest_id, statement_path % k))
-                except: pass
-                else: dump_file(statement_path % k, data)
+                except: print('Note: task ', k, 'has no statements.')
+                else:
+                    attachments = set()
+                    for i in data.decode('latin-1').split('${getfile}=')[1:]:
+                        i = i.split('"', 1)[0]
+                        attachments.add(i)
+                    dump_file(statement_path % k, data)
+                    if '--attachments' in options:
+                        for i in attachments:
+                            print('Fetching attachment %s for task %s...'%(i, k))
+                            try: attachment = easy_incat(self, task, '/home/judges/%06d/%s'%(contest_id, attachment_path % (k, i)))
+                            except: print('Warning: failed downloading', i)
+                            else: dump_file(attachment_path % (k, i), attachment)
     if '--checkers' in options or '--binary-checkers' in options:
         for k, v in problems.items():
-            if 'abstract' not in v and get_task_param(k, 'standard_checker', do_eval=True) != None:
+            if 'abstract' not in v and get_task_param(k, 'standard_checker', do_eval=True) == None:
                 print('Fetching checker for task %s...'%k)
                 data = None
                 try: data = easy_incat(self, task, '/home/judges/%06d/%s.cpp'%(contest_id, checker_path % k))
@@ -229,10 +242,10 @@ def do_inctools(self, cmd):
         protocol <subm_id>
         Dump full testing protocol for a submission.
 
-        dump-tests --dump-path <path> <subm_id>
+        --dump-path <path> <task> dump-tests <subm_id>
         Dump tests from the protocol to the directory specified.
 
-        dump-contest --dump-path <path> [options] <contest_id>
+        --dump-path <path> <task> dump-contest [options] <contest_id>
         Dump contest to the directory specified.
         Supported options:
             --tests
@@ -241,6 +254,10 @@ def do_inctools(self, cmd):
             --statements
             Dump statements.
 
+            --attachments
+            Dump statement attachments (PDF statements/embedded images).
+            (implies --statements)
+
             --checkers
             Dump checkers' source code.
 
@@ -248,6 +265,9 @@ def do_inctools(self, cmd):
             Dump checker binaries if source code is not available.
             If the source is available, binaries won't be dumped.
             (implies --checkers)
+
+            --all
+            Dump everything of the above.
     """
     brutejudge.cheats.cheating(self)
     cmd = shlex.split(cmd)
@@ -288,8 +308,10 @@ def do_inctools(self, cmd):
         while len(cmd) >= 3 and cmd[2].startswith('--'):
             options.add(cmd[2])
             del cmd[2]
-        if len(cmd) != 3 or not options.issubset({"--tests", "--statements", "--checkers", "--binary-checkers"}):
+        if len(cmd) != 3 or not options.issubset({"--all", "--tests", "--statements", "--attachments", "--checkers", "--binary-checkers"}):
             return self.do_help('inctools')
+        if "--all" in options:
+            options = {"--tests", "--statements", "--attachments", "--checkers", "--binary-checkers"}
         if not cmd[2].isnumeric():
             raise BruteError("contest_id must be a number")
         tgt_id = int(cmd[2])

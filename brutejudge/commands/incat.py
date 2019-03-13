@@ -3,6 +3,7 @@ from brutejudge.commands.asubmit import get_possible_lang_id
 from brutejudge.commands.astatus import still_running
 from brutejudge.commands.samples import get_samples
 from brutejudge.http import task_list, submit, submission_list, submission_status
+from brutejudge.http.codeforces import CodeForces
 from brutejudge.error import BruteError
 import shlex, sys, random
 
@@ -92,8 +93,8 @@ int main()
 {
     string included_s(included, included_length);
     %sif(%d < included_s.size())
-        %s << included_s.substr(%d, 65536);
-%s    return 0;
+        %s << included_s.substr(%d, 65536);%s
+    return 0;
 }
 """%(include_code, random.random(), (filter.strip()+'\n').replace('\n', '\n    '), lans, 'ifstream("%s")'%self.input_file if hasattr(self, 'input_file') else 'cout', lans, cerr_output if not isinstance(self.url, CodeForces) else ''))
         idx = (idx + 1) % 4
