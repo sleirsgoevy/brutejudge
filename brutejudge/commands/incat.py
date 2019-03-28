@@ -2,7 +2,7 @@ import brutejudge.cheats
 from brutejudge.commands.asubmit import get_possible_lang_id
 from brutejudge.commands.astatus import still_running
 from brutejudge.commands.samples import get_samples
-from brutejudge.http import task_list, submit, submission_list, submission_status
+from brutejudge.http import task_list, submit, submission_list, submission_status, compile_error
 from brutejudge.http.codeforces import CodeForces
 from brutejudge.error import BruteError
 import shlex, sys, random
@@ -60,6 +60,11 @@ def do_incat(self, cmd):
     incat(self, task, task_id, filepath, f, filter=filter)
     if savepath != None: f.close()
 
+class IncatCompileError(BruteError):
+    def __init__(self, msg, err):
+        BruteError.__init__(self, msg)
+        self.err = err
+
 def incat(self, task, task_id, filepath, f, filter='', custom_include=None):
     if isinstance(filepath, str): filepath = (filepath,)
     filepath = tuple('/'.join(['..']*15)+i if i.startswith('/') else i for i in filepath)
@@ -112,6 +117,8 @@ int main()
         sys.stderr.write('\b \b')
         sys.stderr.flush()
         idx = (idx + 1) % 4
+        if submission_status(self.url, self.cookie, subm_id) == 'Compilation error':
+            raise IncatCompileError("Compilation error.", compile_error(self.url, self.cookie, subm_id))
         samples = get_samples(self.url, self.cookie, subm_id)
         if not samples:
             raise BruteError("No sample tests for this task.")

@@ -64,9 +64,17 @@ class Informatics(Ejudge):
         self.tasks = tasks
         self.subm_list = []
         self.subm_set = set()
+        self._cache = {}
         self.submission_list()
+    def _cache_get(self, url):
+        with self.cache_lock:
+            if url in self._cache: return self._cache[url]
+        ans = self.opener.open("https://informatics.msk.ru"+url).read()
+        with self.cache_lock:
+            if self.caching: self._cache[url] = ans
+        return ans
     def _request_json(self, url):
-        return json.loads(self.opener.open("https://informatics.msk.ru"+url).read().decode('utf-8', 'replace'))
+        return json.loads(self._cache_get(url).decode('utf-8', 'replace'))
     def task_list(self):
         return list(map(str, self.tasks))
     def submission_list(self):
@@ -165,14 +173,14 @@ class Informatics(Ejudge):
         try: return [c[0] for a, b, c, d in self.subm_list if a == id][0]
         except IndexError: return None
     def submission_source(self, id):
-        req = self.opener.open("https://informatics.msk.ru/moodle/ajax/ajax_file.php?objectName=source&contest_id=%d&run_id=%d"%divmod(int(id), 1000000)).read().decode('utf-8', 'replace')
+        req = self._cache_get("/moodle/ajax/ajax_file.php?objectName=source&contest_id=%d&run_id=%d"%divmod(int(id), 1000000)).decode('utf-8', 'replace')
         try: return html.unescape(req.split('<textarea ', 1)[1].split('>', 1)[1].split('</textarea>', 1)[0]).encode('utf-8')
         except IndexError: return None
     def do_action(self, *args):
         raise BruteError("NYI")
     def compiler_list(self, prob_id):
         known_compilers = {1: 'fpc', 2: 'gcc', 3: 'g++', 22: 'php', 23: 'python', 24: 'perl', 25: 'mcs', 26: 'ruby', 27: 'python3'}
-        data = self.opener.open("https://informatics.msk.ru/mod/statements/view3.php?chapterid=%d"%prob_id).read().decode('utf-8', 'replace')
+        data = self._cache_get("/mod/statements/view3.php?chapterid=%d"%prob_id).decode('utf-8', 'replace')
         ans = []
         for i in data.split('<select name="lang_id" id="lang_id" ', 1)[1].split('>', 1)[1].split('</select>', 1)[0].split("<option value='")[1:]:
             a = int(i.split("'", 1)[0])
@@ -197,7 +205,7 @@ class Informatics(Ejudge):
         return (ans, None)
     def submission_score(self, id):
         self.submission_list()
-        try: return [int(d) for a, b, c, d in self.subm_list if a == id][0]
+        try: return [d for a, b, c, d in self.subm_list if a == id][0]
         except (ValueError, IndexError): return None
     def problem_info(self, id):
         data = urllib.request.urlopen("https://informatics.msk.ru/mod/statements/view3.php?chapterid=%d"%id).read().decode('utf-8', 'replace')
@@ -224,4 +232,5 @@ class Informatics(Ejudge):
         raise BruteError("Clarifications don't exits on informatics.msk.ru")
     def read_clar(self, id):
         raise BruteError("Clarifications don't exits on informatics.msk.ru")
-
+    def stop_caching(self):
+        self._cache.clear()

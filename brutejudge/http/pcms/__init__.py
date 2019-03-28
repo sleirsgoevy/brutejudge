@@ -19,15 +19,23 @@ class PCMS(Backend):
         self._user_clars_set = set()
         self.pcms.set_locale('English')
         self.submission_list()
+        self._call_cache = {}
     @staticmethod
     def _remove_tags(t):
         t = t.split('<')
         return t[0] + ''.join(i.split('>', 1)[-1] for i in t[1:])
+    def _cache_call(self, func, *args):
+        with self.cache_lock:
+            if (func, args) in self._call_cache: return self._call_cache[func, args]
+        ans = func(*args)
+        with self.cache_lock:
+            if self.caching: self._call_cache[func, args] = ans
+        return ans
     def task_list(self):
         try: return self.pcms.get_submit()[0]
         except: raise BruteError("Failed to fetch task list.")
     def submission_list(self):
-        x = self.pcms.get_submissions()
+        x = self._cache_call(self.pcms.get_submissions)
         data = []
         for t, (k, v) in enumerate(sorted(x.items(), key=lambda x:x[0])):
             for i in v:
@@ -51,7 +59,7 @@ class PCMS(Backend):
         return (task, attempt)
     def submission_results(self, subm_id):
         task, attempt = self._decode_subm_id(subm_id)
-        proto = self.pcms.get_protocol(task, attempt)
+        proto = self._cache_call(self.pcms.get_protocol, task, attempt)
         outcomes = []
         times = []
         if proto == None:
@@ -68,7 +76,7 @@ class PCMS(Backend):
     def task_ids(self):
         return list(range(len(self.task_list())))
     def submit(self, taskid, lang, text):
-        tasks, langs, exts, vs = self.pcms.get_submit()
+        tasks, langs, exts, vs = self._cache_call(self.pcms.get_submit)
         task = tasks[taskid]
         lang = [j for i, j, k in self.compiler_list(taskid) if i == lang][0]
         if isinstance(text, str):
@@ -76,7 +84,7 @@ class PCMS(Backend):
         try: self.pcms.submit(task, lang, text, vs, {i[lang] for i in exts.values() if lang in i}.pop())
         except AssertionError: pass
     def status(self):
-        x = self.pcms.get_submissions()
+        x = self._cache_call(self.pcms.get_submissions)
         ans = collections.OrderedDict()
         for k, v in x.items():
             if v:
@@ -85,7 +93,7 @@ class PCMS(Backend):
                 ans[k] = None
         return ans
     def scores(self):
-        x = self.pcms.get_submissions(False)
+        x = self._cache_call(self.pcms.get_submissions, False)
         ans = {}
         for k, v in x.items():
             notnone = False
@@ -99,28 +107,28 @@ class PCMS(Backend):
         return ans
     def compile_error(self, subm_id):
         task, attempt = self._decode_subm_id(subm_id)
-        ans = self.pcms.get_compile_error(task, attempt)
+        ans = self._cache_call(self.pcms.get_compile_error, task, attempt)
         if ans == None: raise IndexError
         return ans
     def submission_status(self, subm_id):
         task, attempt = self._decode_subm_id(subm_id)
-        subms = self.pcms.get_submissions()
+        subms = self._cache_call(self.pcms.get_submissions)
         for i in subms[task]:
             if 'attempt' in i[1] and int(i[1]['attempt']) == attempt:
                 return self._remove_tags(i[1]['outcome']) if 'outcome' in i[1] else None
         return None
     def submission_source(self, subm_id):
         task, attempt = self._decode_subm_id(subm_id)
-        return self.pcms.get_source(task, attempt)
+        return self._cache_call(self.pcms.get_source, task, attempt)
     def compiler_list(self, task_id):
-        tasks, langs, jp, vs = self.pcms.get_submit()
+        tasks, langs, jp, vs = self._cache_call(self.pcms.get_submit)
         return [(i + 1, j, k) for i, (j, k) in enumerate(sorted(langs.items())) if j in jp[tasks[task_id]]]
     def submission_stats(self, subm_id):
         task, attempt = self._decode_subm_id(subm_id)
         ans = {}
         score = self.submission_score(subm_id)
         if score != None: ans['score'] = score
-        proto = self.pcms.get_protocol(task, attempt)
+        proto = self._cache_call(self.pcms.get_protocol, task, attempt)
         if proto == None:
             raise BruteError("Failed to fetch testing protocol.")
         group_scores = []
@@ -145,10 +153,10 @@ class PCMS(Backend):
     def do_action(self, *args):
         raise BruteError("Not implemented on PCMS")
     def problem_info(self, task_id):
-        return ({}, self.pcms.get_links())
+        return ({}, self._cache_call(self.pcms.get_links))
     def submission_score(self, subm_id):
         task, attempt = self._decode_subm_id(subm_id)
-        subms = self.pcms.get_submissions()
+        subms = self._cache_call(self.pcms.get_submissions)
         score = None
         for i in subms[task]:
             if 'attempt' in i[1] and int(i[1]['attempt']) == attempt:
@@ -156,12 +164,12 @@ class PCMS(Backend):
                     score = int(i[1]['score'].split(' = ', 1)[1])
         return score
     def _get_clars(self):
-        tasks, clars, vs = self.pcms.get_clars()
+        tasks, clars, vs = self._cache_call(self.pcms.get_clars)
         self._clars = list(clars)
         return tasks, clars, vs
     def clars(self):
         self._get_clars()
-        self._messages = [j for i, j in self.pcms.get_messages() if i == 'msg']
+        self._messages = [j for i, j in self._cache_call(self.pcms.get_messages) if i == 'msg']
         data = [(i * 2, j[1]['text'].split('.', 1)[0]+': '+j[1]['text pre'].replace('\r', '').replace('\n', ' ')+': '+j[1]['type']) for i, j in enumerate(reversed(self._clars))]
         data += [(i * 2 + 1, j) for i, j in enumerate(reversed(self._messages))]
         for x in data:
@@ -183,3 +191,5 @@ class PCMS(Backend):
             return self._clars[-1-id][1]['answer pre']
         else:
             return self._messages[-1-id]
+    def stop_caching(self):
+        self._call_cache.clear()

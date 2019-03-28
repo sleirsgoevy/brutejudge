@@ -1,5 +1,5 @@
 import brutejudge.cheats, io, base64, gzip, shlex, sys, os.path, ast
-from brutejudge.commands.incat import incat, base64_filter
+from brutejudge.commands.incat import incat, base64_filter, IncatCompileError
 from brutejudge.http import task_list, task_ids
 from brutejudge.http.ejudge import Ejudge
 from brutejudge.error import BruteError
@@ -14,12 +14,34 @@ def easy_incat(self, task, filepath, custom_include=None, binary=True):
     if binary: ans = base64.b64decode(ans.encode('ascii'))
     return ans
 
-def easy_incat_multiple(self, task, filepaths):
+def easy_incat_multiple(self, task, filepaths, retry=False):
     if not filepaths: return []
     separator = os.urandom(64)
     xsep = '\\"'+''.join('\\\\x%02x'%i for i in separator)+'\\"'
     custom_include = ('.ascii '+xsep+'\\n.incbin \\"%s\\"\\n')*len(filepaths)
     try: data = easy_incat(self, task, tuple(filepaths), custom_include)
+    except IncatCompileError as err:
+        if not retry: raise
+        s = err.err.replace('\r\n', '\n')
+        if ': Assembler messages:\n' not in s: raise
+        s = s.split(': Assembler messages:\n', 1)[1].split('\n')
+        notavail = set()
+        for l in s:
+            p = None
+            if ': Error: file not found: ' in l:
+                p = l.split(': Error: file not found: ', 1)[1]
+            elif ': Error: seek to end of .incbin file failed `' in l and l[-1] == "'":
+                p = l.split(': Error: seek to end of .incbin file failed 1', 1)[1][:-1]
+            if p != None:
+                p0 = '/'.join(['..']*15)
+                if p.startswith(p0):
+                    p = p[len(p0):]
+                notavail.add(p)
+        fps = [i for i in filepaths if i not in notavail]
+        ans = easy_incat_multiple(self, task, fps)
+        if ans == None: return None
+        ans = iter(ans)
+        return [next(ans) if i not in notavail else None for i in filepaths]
     except: return None
     if data.count(separator) != len(filepaths):
         raise BruteError("You're 2**-512 unlucky!")
@@ -171,10 +193,13 @@ def dump_contest(self, path, task, contest_id, options):
     if '--tests' in options:
         def do_dump_tests(k, low, high, pat):
             paths = [tests_path % k + '/' + pat % i for i in range(low, high)]
-            data = easy_incat_multiple(self, task, ['/home/judges/%06d/%s'%(contest_id, i) for i in paths])
+            data = easy_incat_multiple(self, task, ['/home/judges/%06d/%s'%(contest_id, i) for i in paths], retry=True)
             if data == None: return False
+            partial = 0
             for k, v in zip(paths, data):
-                dump_file(k, v)
+                if v == None: partial += 1
+                else: dump_file(k, v)
+            if partial: raise StopIteration(partial)
             return True
         for k, v in problems.items():
             if 'abstract' not in v:
@@ -182,14 +207,23 @@ def dump_contest(self, path, task, contest_id, options):
                 test_pat = get_task_param(k, 'test_pat', '%03d' + get_task_param(k, 'test_sfx', '', do_eval=True), do_eval=True)
                 corr_pat = get_task_param(k, 'corr_pat', '%03d' + get_task_param(k, 'corr_sfx', '', do_eval=True), do_eval=True)
                 low = 1
-                high = 2
-                while do_dump_tests(k, low, high, test_pat):
+                high = 32
+                while True:
+                    try:
+                        if not do_dump_tests(k, low, high, test_pat): break
+                    except StopIteration as e:
+                        low = high = high - e.args[0]
+                        break
                     low = high
                     print(low - 1, 'tests dumped...')
-                    high *= 2
+                    high = min(high * 2, high + 128)
                 while high - low > 1:
-                    mid = (high + low) // 2
-                    if do_dump_tests(k, low, mid, test_pat):
+                    mid = min(low + 300, (high + low) // 2)
+                    try: f = do_dump_tests(k, low, mid, test_pat)
+                    except StopIteration as e:
+                        low = high = mid - e.args[0]
+                        break
+                    if f:
                         low = mid
                         print(low - 1, 'tests dumped...')
                     else:
