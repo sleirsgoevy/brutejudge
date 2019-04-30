@@ -27,7 +27,7 @@ class JJS(Backend):
     def task_list(self):
         return ['dummy']
     def submission_list(self):
-        code, headers, data = json_req(self.url+"/submissions/list?limit=2147483647", None, {"X-JJS-Auth": self.cookie})
+        code, headers, data = json_req(self.url+"/submissions/list", {'limit': 2147483647}, {"X-JJS-Auth": self.cookie})
         if data and 'Ok' in data:
             return list(reversed([i['id'] for i in data['Ok']])), ['dummy' for i in range(len(data['Ok']))]
         return [], []
@@ -40,30 +40,32 @@ class JJS(Backend):
         code, headers, data = json_req(self.url+"/submissions/send", {'toolchain': lang, 'code': list(text)}, {"X-JJS-Auth": self.cookie})
 #       print(code, headers, data)
     def compiler_list(self, task):
-        code, headers, data = json_req(self.url+"/toolchains/list", None, {"X-JJS-Auth": self.cookie})
+        code, headers, data = json_req(self.url+"/toolchains/list", {}, {"X-JJS-Auth": self.cookie})
         if data and 'Ok' in data:
             return [(x['id'], x['name'], x['name']) for x in data['Ok']]
         else:
             raise BruteError("Failed to fetch language list")
     def _submission_descr(self, id):
-        code, headers, data = json_req(self.url+"/submissions/list?limit=2147483647", None, {"X-JJS-Auth": self.cookie})
+        code, headers, data = json_req(self.url+"/submissions/list", {'limit': 2147483647}, {"X-JJS-Auth": self.cookie})
         if data and 'Ok' in data:
             for i in data['Ok']:
                 if i['id'] == id:
-                    return i['state']
+                    return i
         return None
     def submission_status(self, id):
         st = self._submission_descr(id)
-        if isinstance(st, str): return st
-        elif isinstance(st, dict) and 'Done' in st:
-           return st['Done'].get('status_name', None)
-        else: return None
+#       if isinstance(st, str): return st
+#       elif isinstance(st, dict) and 'Done' in st:
+#          return st['Done'].get('status_name', None)
+#       else: return None
+        return st['status']
     def compile_error(self, id):
         return 'STUB'
     def submission_stats(self, id):
         return ({}, None)
     def submission_score(self, id):
         st = self._submission_descr(id)
-        if isinstance(st, dict) and 'Done' in st:
-            return st['Done'].get('score', None)
-        else: return None
+#       if isinstance(st, dict) and 'Done' in st:
+#           return st['Done'].get('score', None)
+#       else: return None
+        return st['score']
