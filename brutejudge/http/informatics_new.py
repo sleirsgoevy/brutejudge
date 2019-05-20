@@ -66,6 +66,7 @@ class Informatics(Ejudge):
             tasks = [int(query['chapterid'])]
         self.tasks = tasks
         self.subm_list = []
+        self.subm_list_partial = []
         self.subm_set = {}
         self._cache = {}
         self.submission_list()
@@ -82,21 +83,25 @@ class Informatics(Ejudge):
         return list(map(str, self.tasks))
     def submission_list(self):
         subms = []
+        subms_partial = []
         page_cnt = self._request_json(SUBM_LIST_URL%(self.user_id, 100, 1))['metadata']['page_count']
-        idx = -len(self.subm_list)
         for i in range(page_cnt):
             data = self._request_json(SUBM_LIST_URL%(self.user_id, 100, i+1))['data']
             for i in data:
                 task_id = i['problem']['id']
                 si = i['id']
                 if si in self.subm_set: break
-                if int(task_id) in self.tasks: subms.append([si, task_id])
-                idx -= 1
-                self.subm_set[si] = idx
+                subms.append([si, task_id])
+                if int(task_id) in self.tasks: subms_partial.append([si, task_id])
             else: continue
             break
+        idx = -len(self.subm_list)-len(subms)
+        for a, b in subms:
+            self.subm_set[a] = idx
+            idx += 1
         self.subm_list[:0] = subms
-        return ([i[0] for i in self.subm_list], [i[1] for i in self.subm_list])
+        self.subm_list_partial[:0] = subms_partial
+        return ([i[0] for i in self.subm_list_partial], [str(i[1]) for i in self.subm_list_partial])
     def submission_results(self, id):
         data = self._request_json("/py/protocol/get/%d"%int(id)).get('tests', {})
         ans1 = []
@@ -141,7 +146,7 @@ class Informatics(Ejudge):
     def status(self):
         self.submission_list()
         by_task = {}
-        for a, b in self.subm_list:
+        for a, b in self.subm_list_partial:
             c = self._submission_status(a)
             if b not in by_task or by_task[b][1] < c[1]:
                 by_task[b] = c
@@ -149,7 +154,7 @@ class Informatics(Ejudge):
     def scores(self):
         self.submission_list()
         by_task = {}
-        for a, b in self.subm_list:
+        for a, b in self.subm_list_partial:
             d = self.submission_score(a)
             if d != None and (b not in by_task or by_task[b] < d):
                 by_task[b] = d
@@ -161,7 +166,10 @@ class Informatics(Ejudge):
         id = int(id)
         if id not in self.subm_set: return None
         match = len(self.subm_list) + self.subm_set[id]
-        return self._request_json(SUBM_LIST_URL%(self.user_id, 100, match // 100 + 1))['data'][match % 100]
+#       print(id, self.subm_list[match])
+        ans = self._request_json(SUBM_LIST_URL%(self.user_id, 100, match // 100 + 1))['data'][match % 100]
+#       print('submission_object', id, '=', ans)
+        return ans
     def _submission_status(self, id):
         statuses = {
             0: ('OK', 2),
