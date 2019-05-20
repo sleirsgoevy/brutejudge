@@ -87,8 +87,8 @@ class Informatics(Ejudge):
         for i in range(page_cnt):
             data = self._request_json(SUBM_LIST_URL%(self.user_id, 100, i+1))['data']
             for i in data:
-                task_id = data['problem']['id']
-                si = data['id']
+                task_id = i['problem']['id']
+                si = i['id']
                 if si in self.subm_set: break
                 if int(task_id) in self.tasks: subms.append([si, task_id])
                 idx -= 1
