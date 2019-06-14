@@ -99,6 +99,6 @@ def do_score100(self, cmd):
             status = submission_status(self.url, self.cookie, lx2[0])
             if not still_running(status): break
         if status == 'OK': return
-        elif status == 'Compilation error': test_cnt_high = test_cnt
+        elif status == ('Compilation error', 'Compiler failed'): test_cnt_high = test_cnt
         else: test_cnt_low = test_cnt
     raise BruteError("Unknown failure, probably an interactive task.")

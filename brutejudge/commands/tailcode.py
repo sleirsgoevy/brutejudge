@@ -4,7 +4,7 @@ from brutejudge.error import BruteError
 import os.path
 
 def get_tailcode(self, subm_id, suf):
-    if submission_status(self.url, self.cookie, subm_id) != 'Compilation error':
+    if submission_status(self.url, self.cookie, subm_id) not in ('Compilation error', 'Compiler failed'):
         raise BruteError("Submission didn't fail to compile")
     err = compile_error(self.url, self.cookie, subm_id)
     if err == None: err = ''

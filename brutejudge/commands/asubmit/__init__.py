@@ -1,4 +1,4 @@
-from brutejudge.http import submit, task_list, task_ids, submission_list, compiler_list
+from brutejudge.http import submit, task_list, task_ids, submission_list, compiler_list, may_cache
 from brutejudge.error import BruteError
 import os.path, shlex
 
@@ -41,33 +41,34 @@ def do_asubmit(self, cmd):
         if modname[:1] == '.': modname = 'brutejudge.commands.asubmit.format_'+modname[1:]
     if len(sp) != 3:
         return self.do_help('asubmit')
-    tasks = task_list(self.url, self.cookie)
-    try: task_id = tasks.index(sp[0])
-    except ValueError:
-        raise BruteError("No such task.")
-    if not sp[1].isnumeric():
-        sp[1] = get_lang_id(self, sp[1], task_id)
-    try:
-        name = sp[2]
-        module = None
-        ext = os.path.splitext(name)[1][1:]
-        if modname == None: modname = 'brutejudge.commands.asubmit.format_'+ext
+    with may_cache(self.url, self.cookie):
+        tasks = task_list(self.url, self.cookie)
+        try: task_id = tasks.index(sp[0])
+        except ValueError:
+            raise BruteError("No such task.")
+        if not sp[1].isnumeric():
+            sp[1] = get_lang_id(self, sp[1], task_id)
         try:
-            module = __import__(modname, fromlist=True)
-        except ImportError: pass
-        if not getattr(module, 'check_exists', os.path.exists)(name):
-            raise BruteError("File not found.")
-        if hasattr(module, 'read_file'):
-            data = module.read_file(name)
-        else:
-            with open(name, 'rb') as file:
-                data = file.read()
-        if hasattr(module, 'format'):
-            data = module.format(data)
-    except UnicodeDecodeError:
-        raise BruteError("File is binary.")
-    before = submission_list(self.url, self.cookie)[0]
-    submit(self.url, self.cookie, task_id, int(sp[1]), data)
+            name = sp[2]
+            module = None
+            ext = os.path.splitext(name)[1][1:]
+            if modname == None: modname = 'brutejudge.commands.asubmit.format_'+ext
+            try:
+                module = __import__(modname, fromlist=True)
+            except ImportError: pass
+            if not getattr(module, 'check_exists', os.path.exists)(name):
+                raise BruteError("File not found.")
+            if hasattr(module, 'read_file'):
+                data = module.read_file(name)
+            else:
+                with open(name, 'rb') as file:
+                    data = file.read()
+            if hasattr(module, 'format'):
+                data = module.format(data)
+        except UnicodeDecodeError:
+            raise BruteError("File is binary.")
+        before = submission_list(self.url, self.cookie)[0]
+        submit(self.url, self.cookie, task_id, int(sp[1]), data)
     after = submission_list(self.url, self.cookie)[0]
     if before == after:
         raise BruteError("Error while sending.")

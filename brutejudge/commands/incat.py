@@ -117,7 +117,7 @@ int main()
         sys.stderr.write('\b \b')
         sys.stderr.flush()
         idx = (idx + 1) % 4
-        if submission_status(self.url, self.cookie, subm_id) == 'Compilation error':
+        if submission_status(self.url, self.cookie, subm_id) in ('Compilation error', 'Compiler failed'):
             raise IncatCompileError("Compilation error.", compile_error(self.url, self.cookie, subm_id))
         samples = get_samples(self.url, self.cookie, subm_id)
         if not samples:
