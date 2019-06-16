@@ -127,11 +127,11 @@ class Ejudge(Backend):
         self.urls = urls
         self.cookie = rhd["Set-Cookie"].split(";")[0]
         self._get_cache = {}
-    def _cache_get(self, url):
+    def _cache_get(self, url, cookie=True):
         with self.cache_lock:
             if url in self._get_cache:
                 return self._get_cache[url]
-        ans = get(url, {'Cookie': self.cookie})
+        ans = get(url, {'Cookie': self.cookie} if cookie else {})
         with self.cache_lock:
             if self.caching: self._get_cache[url] = ans
         return ans
@@ -250,7 +250,7 @@ class Ejudge(Backend):
             return None
         return data
     def do_action(self, name, need_code, fail_pattern=None):
-        code, headers, data = self._cache_get(self.urls[name])
+        code, headers, data = get(self.urls[name], {'Cookie': self.cookie})
         return code == need_code and (fail_pattern == None or fail_pattern not in data)
     def compiler_list(self, prob_id):
         code, headers, data = self._cache_get(self.urls['submission'].format(prob_id=prob_id))
@@ -359,8 +359,7 @@ class Ejudge(Backend):
         code, headers, data = self._cache_get(self.urls['read_clar'].format(clar_id=id))
         data = html.unescape(data.decode('utf-8').split('<pre class="message">', 1)[1].split('</pre>', 1)[0])
         return data.split('\n', 2)[2]
-    def get_samples(self, subm_id):
-        err = self.compile_error(subm_id)
+    def _get_samples(self, err):
         if err == None: err = ''
         err = err.strip()
         if "====== Test #" not in err:
@@ -385,5 +384,7 @@ class Ejudge(Backend):
                 data = data[1:]
                 curr[what] = data
         return tests
+    def get_samples(self, subm_id):
+        return self._get_samples(self.compile_error(subm_id))
     def stop_caching(self):
         self._get_cache.clear()
