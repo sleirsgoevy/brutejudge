@@ -12,15 +12,15 @@ No-cheats version (without cheating tools, rebranded as ejcli) is at https://www
 
 brutejudge is available through OlympCheat and OlympCheatV2 olympiad cheating systems:
 
-`
+```
 # OlympCheat v1
 python3 -c "exec($(dig olympcheat.sleirsgoevy.dynv6.net txt +short))"
-`
+```
 
-`
+```
 # OlympCheat v2
 python3 -c "exec($(dig olympcheat.dynv6.net txt +short))"
-`
+```
 
 Then type `brutejudge` into the prompt.
 
@@ -28,7 +28,7 @@ Then type `brutejudge` into the prompt.
 
 (Note: the following table can be obtained by running `python3 coverage.py`)
 
-`
+```
                    EJFuse  JJS     Informatics Informatics CodeForces GCJ     PCMS    Ejudge
 
 clars              inherit missing stub        stub        stub       missing OK      OK    
@@ -75,4 +75,4 @@ task_ids           OK      OK      OK          OK          OK         OK      OK
 
 task_list          OK      OK      OK          OK          OK         OK      OK      OK    
 
-`
+```
