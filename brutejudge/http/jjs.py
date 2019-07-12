@@ -31,15 +31,20 @@ class JJS(Backend):
             self.cookie = data['Ok']['buf']
         self.url = url
         self.contest = contest_id
-    def task_list(self):
+    def _task_list(self):
         code, headers, data = json_req(self.url+'/contests/describe', self.contest, {"X-JJS-Auth": self.cookie})
+#       print(data)
         if not data or 'Ok' not in data:
             raise BruteError('Login failed')
-        return [i['code'] for i in data['Ok']['problems']]
+        return [(i['code'], 'todo') for i in data['Ok']['problems']]
+    def task_list(self):
+        return [i[0] for i in self._task_list()]
     def submission_list(self):
         code, headers, data = json_req(self.url+"/submissions/list", {'limit': 2147483647}, {"X-JJS-Auth": self.cookie})
+        tl = {j:i for i, j in self._task_list()}
+#       print(data)
         if data and 'Ok' in data:
-            return list(reversed([i['id'] for i in data['Ok']])), ['dummy' for i in range(len(data['Ok']))]
+            return list(reversed([i['id'] for i in data['Ok']])), list(reversed(['dummy' for i in range(len(data['Ok']))]))
         return [], []
     def submission_results(self, id):
         return [], []

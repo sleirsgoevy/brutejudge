@@ -237,5 +237,7 @@ class Informatics(Ejudge):
         raise BruteError("Clarifications don't exits on informatics.msk.ru")
     def read_clar(self, id):
         raise BruteError("Clarifications don't exits on informatics.msk.ru")
+    def get_samples(self, subm_id):
+        raise BruteError("Can't get samples on informatics.msk.ru")
     def stop_caching(self):
         self._cache.clear()    

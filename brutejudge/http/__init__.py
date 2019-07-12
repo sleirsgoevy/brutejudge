@@ -1,8 +1,8 @@
-import brutejudge.http.ejudge, brutejudge.http.ejudge.ejfuse, brutejudge.http.pcms, brutejudge.http.jjs, brutejudge.http.informatics, brutejudge.http.informatics_new, brutejudge.http.codeforces, urllib.request
+import brutejudge.http.ejudge, brutejudge.http.ejudge.ejfuse, brutejudge.http.pcms, brutejudge.http.jjs, brutejudge.http.informatics, brutejudge.http.informatics_new, brutejudge.http.codeforces, brutejudge.http.gcj, urllib.request
 from brutejudge.http.ejudge import contest_name
 from brutejudge.error import BruteError
 
-backend_path = [ejudge.ejfuse.EJFuse, jjs.JJS, informatics.Informatics, informatics_new.Informatics, pcms.PCMS, codeforces.CodeForces, ejudge.Ejudge]
+backend_path = [ejudge.ejfuse.EJFuse, jjs.JJS, informatics.Informatics, informatics_new.Informatics, codeforces.CodeForces, gcj.GCJ, pcms.PCMS, ejudge.Ejudge]
 
 def login(url, login, password):
     for i in backend_path:
