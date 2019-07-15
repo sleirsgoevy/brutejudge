@@ -78,7 +78,7 @@ class GCJ(Backend):
         except KeyError: return 'Pending judgement'
         return [self._convert_verdict(i['verdict__str']) for i in subm], ['%0.3f'%(i['running_time_nanos']/1000000000) for i in subm]
     def submission_results(self, subm_id):
-        ans = self._submission_descr(subm_id)
+        ans = self._submission_results(subm_id)
         if not isinstance(ans, tuple): ans = ([], [])
         return ans
     def submit(self, task, lang, code):
