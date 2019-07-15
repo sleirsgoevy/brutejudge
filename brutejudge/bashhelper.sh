@@ -7,3 +7,4 @@ alias bj=command_not_found_handle
 alias hijack="bj hijack"
 alias nocheats="bj nocheats"
 alias fileio="bj fileio"
+alias taskalias="bj taskalias"

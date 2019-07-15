@@ -35,9 +35,10 @@ class GCJ(Backend):
         with self.cache_lock:
             if self.caching: self._get_cache[url] = ans
         return ans
-    def _json_req(self, url, data, *, eout=True, ein=True):
+    def _json_req(self, url, data, *, eout=True, ein=True, do_post=False):
         if eout: data = b64encode(json.dumps(data).encode('utf-8')).decode('ascii')
-        code, headers, data = self._cache_get(url+'?p='+data)
+        if do_post: code, headers, data = post(url, {'p': data}, {'Authorization': 'Bearer '+self.token})
+        else: code, headers, data = self._cache_get(url+'?p='+data)
         if ein: data = json.loads(b64decode(data).decode('utf-8', 'replace'))
         return code, headers, data
     def _get_which(self, which, error=None, data={}):
@@ -70,13 +71,24 @@ class GCJ(Backend):
             if int(i['id'], 16) == subm_id:
                 return i
         return None
-    def submission_results(self, subm_id):
+    def _submission_results(self, subm_id):
         subm = self._submission_descr(subm_id)
-        if subm == None: return [], []
+        if subm == None: return None
         try: subm = subm['judgement']['results']
-        except KeyError: subm = []
+        except KeyError: return 'Pending judgement'
         return [self._convert_verdict(i['verdict__str']) for i in subm], ['%0.3f'%(i['running_time_nanos']/1000000000) for i in subm]
-    #skip submit for now
+    def submission_results(self, subm_id):
+        ans = self._submission_descr(subm_id)
+        if not isinstance(ans, tuple): ans = ([], [])
+        return ans
+    def submit(self, task, lang, code):
+        if isinstance(code, bytes): code = code.decode('utf-8', 'replace')
+        try: tasks = self._get_which('dashboard', '')
+        except BruteError: return
+        else:
+            try: task = tasks['challenge']['tasks'][task]['id']
+            except IndexError: return
+        self._json_req('https://codejam.googleapis.com/dashboard/%s/submit'%self.round, {'code': code, 'language_id': lang, 'task_id': task}, do_post=True)
     def status(self):
         user_data = {}
         data = self._get_which('scoreboard', "Failed to fetch scoreboard.", {'num_consecutive_users': 0})
@@ -109,9 +121,9 @@ class GCJ(Backend):
         try: return data['judgement']['compilation_output']
         except KeyError: return None
     def submission_status(self, subm_id):
-        a, b = self.submission_results(subm_id)
-        if not a: return None
-        return a[-1]
+        a = self._submission_results(subm_id)
+        if not isinstance(a, tuple): return a
+        return a[0][-1]
     def submission_source(self, subm_id):
         data = self._submission_descr(subm_id)
         if data == None: return None

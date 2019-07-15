@@ -1,6 +1,5 @@
 import urllib.request, urllib.parse, html, json, ssl
 from ...error import BruteError
-from ..ejudge import get
 
 def parse_hidden_inputs(data):
     ans = {}

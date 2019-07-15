@@ -48,7 +48,7 @@ submission_score   OK      OK      OK          OK          OK         OK      OK
 submission_source  OK      missing OK          OK          OK         OK      OK      OK    
 submission_stats   OK      OK      OK          OK          OK         OK      OK      OK    
 submission_status  OK      OK      OK          OK          OK         OK      OK      OK    
-submit             inherit OK      OK          OK          OK         missing OK      OK    
+submit             inherit OK      OK          OK          OK         OK      OK      OK    
 submit_clar        inherit missing stub        stub        stub       missing OK      OK    
 task_ids           OK      OK      OK          OK          OK         OK      OK      OK    
 task_list          OK      OK      OK          OK          OK         OK      OK      OK    
