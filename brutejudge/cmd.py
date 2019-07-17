@@ -167,6 +167,13 @@ class BruteCMD(cmd.Cmd):
         try: __import__('brutejudge.commands.' + cmd)
         except ImportError: raise AttributeError(cmd)
         return type(self.__getattr__)(getattr(getattr(brutejudge.commands, cmd), 'do_'+cmd), self)
+    def get_names(self):
+        dir0 = set(dir(type(self)))
+        import pkgutil
+        try: cmds = list(pkgutil.iter_modules(brutejudge.commands.__path__))
+        except: pass
+        else: dir0 |= {'do_'+i.name for i in cmds if not i.name.startswith('_')}
+        return list(dir0)
     def default(self, cmd):
 #       cmd, arg = (cmd.strip()+' ').split(' ', 1)
 #       arg = arg.strip()
