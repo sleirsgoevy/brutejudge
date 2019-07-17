@@ -31,7 +31,7 @@ class Searcher:
             if submissions == submissions0:
                 raise BruteError("Error sending.")
             while not result[0]:
-                result = http.submission_results(self.url, self.cookie, submission)
+                result = http.submission_results(self.url, self.cookie, submissions[0][0])
             if self.testno >= len(result[0]):
                 raise Finished
             print("#result:", result[0][self.testno])
