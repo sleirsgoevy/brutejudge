@@ -2,6 +2,10 @@
 
 A testing system console client & cheating tool.
 
+# Installation
+
+To install brutejudge, run `python3 setup.py install`. brutejudge only supports Python 3.
+
 # Distribution
 
 Latest version is at https://sleirsgoevy.pythonanywhere.com/olympcheat/packages/brutejudge.zip
