@@ -3,13 +3,15 @@ from brutejudge.error import BruteError
 from brutejudge.http.base import Backend
 from brutejudge.http.ejudge import do_http, get, post
 
-def json_req(url, data, headers={}):
+def gql_req(url, query, params, headers={}):
     headers = dict(headers)
     headers['Content-Type'] = 'application/json'
-    if data != None: code, headers, data = post(url, json.dumps(data), headers)
-    else: code, headers, data = get(url, headers)
+    code, headers, data = post(url, json.dumps({"query": query, "variables": params}), headers)
     try: return (code, headers, json.loads(data.decode('utf-8')))
     except json.JSONDecodeError: return (code, headers, None)
+
+def gql_ok(data):
+    return data and 'data' in data and 'errors' not in data
 
 class JJS(Backend):
     @staticmethod
@@ -19,32 +21,31 @@ class JJS(Backend):
     def __init__(self, url, login, password):
         Backend.__init__(self)
         url, params = url.split('?')
+        if url.endswith('/'): url = url[:-1]
+        url += '/graphql'
         params = {k: v for k, v in (i.split('=', 1) if '=' in i else (i, None) for i in params.split('&'))}
         contest_id = params['contest']
         if 'token' in params:
             self.cookie = password
         else:
-            code, headers, data = json_req(url+'/auth/simple', {"login": login, "password": password})
+            code, headers, data = gql_req(url, 'mutation($a:String!,$b:String!){authSimple(login:$a,password:$b){data}}', {"a": login, "b": password})
 #           print(url, code, headers, data)
-            if not data or 'Ok' not in data:
+            if not gql_ok(data):
                 raise BruteError('Login failed')
-            self.cookie = data['Ok']['buf']
+            self.cookie = data['data']['authSimple']['data']
         self.url = url
         self.contest = contest_id
-    def _task_list(self):
-        code, headers, data = json_req(self.url+'/contests/describe', self.contest, {"X-JJS-Auth": self.cookie})
-#       print(data)
-        if not data or 'Ok' not in data:
-            raise BruteError('Login failed')
-        return [(i['code'], 'todo') for i in data['Ok']['problems']]
     def task_list(self):
-        return [i[0] for i in self._task_list()]
-    def submission_list(self):
-        code, headers, data = json_req(self.url+"/submissions/list", {'limit': 2147483647}, {"X-JJS-Auth": self.cookie})
-        tl = {j:i for i, j in self._task_list()}
+        code, headers, data = gql_req(self.url, 'query{contests{id,problems{id}}}', None, {"X-JJS-Auth": self.cookie})
 #       print(data)
-        if data and 'Ok' in data:
-            return list(reversed([i['id'] for i in data['Ok']])), list(reversed(['dummy' for i in range(len(data['Ok']))]))
+        if not gql_ok(data):
+            raise BruteError("Failed to fetch task list")
+        return [j['id'] for i in data['data']['contests'] if i['id'] == self.contest for j in i['problems']]
+    def submission_list(self):
+        code, headers, data = gql_req(self.url, 'query{submissions{id,problem}}', None, {"X-JJS-Auth": self.cookie})
+#       print(data)
+        if gql_ok(data):
+            return list(reversed([i['id'] for i in data['data']['submissions']])), list(reversed([i['problem'] for i in data['data']['submissions']]))
         return [], []
     def submission_results(self, id):
         return [], []
@@ -52,18 +53,19 @@ class JJS(Backend):
         return list(range(len(self.task_list())))
     def submit(self, taskid, lang, text):
         if isinstance(text, str): text = text.encode('utf-8')
-        code, headers, data = json_req(self.url+"/submissions/send", {'toolchain': lang, 'code': base64.b64encode(text).decode('ascii'), 'problem': self.task_list()[taskid], 'contest': self.contest}, {"X-JJS-Auth": self.cookie})
+        code, headers, data = gql_req(self.url, 'mutation($z:String!,$a:String!,$b:Int!,$c:String!){submitSimple(toolchain:$b,runCode:$c,problem:$a,contest:$z){id}}', {'b': lang, 'c': base64.b64encode(text).decode('ascii'), 'a': self.task_list()[taskid], 'z': self.contest}, {"X-JJS-Auth": self.cookie})
 #       print(code, headers, data)
     def compiler_list(self, task):
-        code, headers, data = json_req(self.url+"/toolchains/list", {}, {"X-JJS-Auth": self.cookie})
-        if data and 'Ok' in data:
-            return [(x['id'], x['name'], x['name']) for x in data['Ok']]
+        code, headers, data = gql_req(self.url, 'query{toolchains{id,name}}', None, {"X-JJS-Auth": self.cookie})
+        if gql_ok(data):
+            return [(x['id'], x['name'], x['name']) for x in data['data']['toolchains']]
         else:
             raise BruteError("Failed to fetch language list")
     def _submission_descr(self, id):
-        code, headers, data = json_req(self.url+"/submissions/list", {'limit': 2147483647}, {"X-JJS-Auth": self.cookie})
-        if data and 'Ok' in data:
-            for i in data['Ok']:
+        id = int(id)
+        code, headers, data = gql_req(self.url, 'query{submissions{id,status{code},score}}', None, {"X-JJS-Auth": self.cookie})
+        if gql_ok(data):
+            for i in data['data']['submissions']:
                 if i['id'] == id:
                     return i
         return None
@@ -80,7 +82,7 @@ class JJS(Backend):
     def compile_error(self, id):
         return 'STUB'
     def submission_stats(self, id):
-        return ({}, None)
+        return ({'score': self.submission_score(id)}, None)
     def submission_score(self, id):
         st = self._submission_descr(id)
 #       if isinstance(st, dict) and 'Done' in st:
