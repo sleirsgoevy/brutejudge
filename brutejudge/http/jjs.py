@@ -42,23 +42,29 @@ class JJS(Backend):
             raise BruteError("Failed to fetch task list")
         return [j['id'] for i in data['data']['contests'] if i['id'] == self.contest for j in i['problems']]
     def submission_list(self):
-        code, headers, data = gql_req(self.url, 'query{submissions{id,problem}}', None, {"X-JJS-Auth": self.cookie})
+        code, headers, data = gql_req(self.url, 'query{submissions{id,problem{id}}}', None, {"X-JJS-Auth": self.cookie})
 #       print(data)
         if gql_ok(data):
-            return list(reversed([i['id'] for i in data['data']['submissions']])), list(reversed([i['problem'] for i in data['data']['submissions']]))
+            return list(reversed([i['id'] for i in data['data']['submissions']])), list(reversed([i['problem']['id'] for i in data['data']['submissions']]))
         return [], []
     def submission_results(self, id):
         return [], []
     def task_ids(self):
         return list(range(len(self.task_list())))
     def submit(self, taskid, lang, text):
+        tl = self.task_list()
+        if taskid not in range(len(tl)): return
+        cl = self.compiler_list(taskid)
+        taskid = tl[taskid]
+        if lang not in range(len(cl)): return
+        lang = cl[lang][1]
         if isinstance(text, str): text = text.encode('utf-8')
-        code, headers, data = gql_req(self.url, 'mutation($z:String!,$a:String!,$b:Int!,$c:String!){submitSimple(toolchain:$b,runCode:$c,problem:$a,contest:$z){id}}', {'b': lang, 'c': base64.b64encode(text).decode('ascii'), 'a': self.task_list()[taskid], 'z': self.contest}, {"X-JJS-Auth": self.cookie})
+        code, headers, data = gql_req(self.url, 'mutation($z:String!,$a:String!,$b:String!,$c:String!){submitSimple(toolchain:$b,runCode:$c,problem:$a,contest:$z){id}}', {'b': lang, 'c': base64.b64encode(text).decode('ascii'), 'a': taskid, 'z': self.contest}, {"X-JJS-Auth": self.cookie})
 #       print(code, headers, data)
     def compiler_list(self, task):
         code, headers, data = gql_req(self.url, 'query{toolchains{id,name}}', None, {"X-JJS-Auth": self.cookie})
         if gql_ok(data):
-            return [(x['id'], x['name'], x['name']) for x in data['data']['toolchains']]
+            return [(i, x['id'], x['name']) for i, x in enumerate(data['data']['toolchains'])]
         else:
             raise BruteError("Failed to fetch language list")
     def _submission_descr(self, id):
