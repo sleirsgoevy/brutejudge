@@ -49,12 +49,12 @@ class JJS(Backend):
         return [], []
     def submission_results(self, id):
         code, headers, data = gql_req(self.url, 'query($a:Int!){runs(id:$a){invocationProtocol}}', {"a": int(id)}, {"X-JJS-Auth": self.cookie})
-        print(code, headers, data)
+#       print(code, headers, data)
         if not gql_ok(data) or len(data['data']['runs']) != 1:
 #           raise BruteError("Failed to fetch testing protocol")
             return [], []
         prot = json.loads(data['data']['runs'][0]['invocationProtocol'])
-        return [self._format_status(i['status_code']) for i in prot['rows']], ['?.???' for i in prot['rows']]
+        return [self._format_status(i['status_code']) for i in prot['tests']], ['?.???' for i in prot['tests']]
     def task_ids(self):
         return list(range(len(self.task_list())))
     def submit(self, taskid, lang, text):
@@ -86,10 +86,16 @@ class JJS(Backend):
         if st == 'ACCEPTED' or st == 'TEST_PASSED': return 'OK'
         return st[:1].upper()+st[1:].lower()
     def compile_error(self, id, *, binary=False, kind=None):
-        assert kind == 3, "only supports fetching compiled binary"
-        code, headers, data = gql_req(self.url, 'query($a:Int!){runs(id:$a){binary}}', {"a": int(id)}, {"X-JJS-Auth": self.cookie})
-        if not gql_ok(data) or len(data['data']['runs']) != 1: return None
-        ans = base64.b64decode(data['data']['runs'][0]['binary'].encode('ascii'))
+        if kind in (None, 1):
+            code, headers, data = gql_req(self.url, 'query($a:Int!){runs(id:$a){invocationProtocol}}', {"a": int(id)}, {"X-JJS-Auth": self.cookie})
+            if not gql_ok(data) or len(data['data']['runs']) != 1: return None
+            prot = json.loads(data['data']['runs'][0]['invocationProtocol'])        
+            ans = base64.b64decode(prot.get('compile_stdout', '').encode('ascii'))+base64.b64decode(prot.get('compile_stderr', '').encode('ascii'))
+        elif kind == 3:
+            code, headers, data = gql_req(self.url, 'query($a:Int!){runs(id:$a){binary}}', {"a": int(id)}, {"X-JJS-Auth": self.cookie})
+            if not gql_ok(data) or len(data['data']['runs']) != 1: return None
+            ans = base64.b64decode(data['data']['runs'][0]['binary'].encode('ascii'))
+        else: return None
         if not binary: ans = ans.decode('utf-8', 'replace')
         return ans
     def submission_status(self, id):
