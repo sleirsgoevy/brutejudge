@@ -49,7 +49,7 @@ stop_caching       inherit inherit OK          OK          OK         OK      OK
 submission_list    OK      OK      OK          OK          OK         OK      OK      OK    
 submission_results OK      OK      OK          OK          OK         OK      OK      OK    
 submission_score   OK      OK      OK          OK          OK         OK      OK      OK    
-submission_source  OK      missing OK          OK          OK         OK      OK      OK    
+submission_source  OK      OK      OK          OK          OK         OK      OK      OK    
 submission_stats   OK      OK      OK          OK          OK         OK      OK      OK    
 submission_status  OK      OK      OK          OK          OK         OK      OK      OK    
 submit             inherit OK      OK          OK          OK         OK      OK      OK    
