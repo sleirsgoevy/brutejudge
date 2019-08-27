@@ -83,7 +83,7 @@ class JJS(Backend):
         return None
     def _format_status(self, st):
         st = st.replace('_', ' ')
-        if st == 'ACCEPTED' or st == 'TEST_PASSED': return 'OK'
+        if st == 'ACCEPTED' or st == 'TEST PASSED': return 'OK'
         return st[:1].upper()+st[1:].lower()
     def compile_error(self, id, *, binary=False, kind=None):
         if kind in (None, 1):
