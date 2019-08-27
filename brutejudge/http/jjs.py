@@ -119,3 +119,17 @@ class JJS(Backend):
 #           return st['Done'].get('score', None)
 #       else: return None
         return st['score'] if st != None else None
+    def get_samples(self, id, *, binary=False):
+        def deb64(x):
+            ans = base64.b64decode(x.encode('ascii'))
+            if not binary: ans = ans.decode('utf-8', 'replace')
+            return ans
+        ans = {}
+        code, headers, data = gql_req(self.url, 'query($a:Int!){runs(id:$a){invocationProtocol}}', {"a": int(id)}, {"X-JJS-Auth": self.cookie})
+        if not gql_ok(data) or len(data['data']['runs']) != 1: return ans
+        proto = json.loads(data['data']['runs'][0]['invocationProtocol'])
+        for i, j in enumerate(proto['tests']):
+            cur = ans[i + 1] = {}
+            for k1, k2 in (('test_stdin', 'Input'), ('test_stdout', 'Output'), ('test_stderr', 'Stderr')):
+                if k1 in j and j[k1] != None: cur[k2] = deb64(j[k1])
+        return ans

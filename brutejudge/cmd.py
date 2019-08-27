@@ -1,5 +1,5 @@
 import cmd, sys, traceback, os, shlex
-from .http import login, task_list, submission_list, submission_results, submission_status, submit, status, scores, compile_error, submission_source, task_ids, compiler_list, submission_stats, submission_score
+from .http import login, task_list, submission_list, submission_results, submission_status, submit, status, scores, compile_error, submission_source, task_ids, compiler_list, submission_stats, submission_score, has_feature
 from .error import BruteError
 import brutejudge.commands
 
@@ -192,18 +192,41 @@ class BruteCMD(cmd.Cmd):
             code.interact(local={'self': self})
     def do_geterror(self, cmd):
         """
-        usage: geterror <subm_id>
+        usage: geterror [--binary] [--kind <kind>] <subm_id>
 
-        Get compile-time errors for submission (if any).
+        Get errors for submission (if any).
+        Possible kinds (default order):
+           --. Judge comment
+            2. Valuer comment
+            1. Compilation error
+            3. Binary xecutable file (JJS only)
         """
         sp = cmd.split()
+        kwargs = {}
+        if sp and sp[0] == '--binary':
+            if not has_feature(self.url, self.cookie, 'compile_error', 'binary'):
+                raise BruteError('This system does not support --binary in geterror.')
+            del sp[0]
+            kwargs['binary'] = True
+        if len(sp) >= 2 and sp[0] == '--kind':
+            if not has_feature(self.url, self.cookie, 'compile_error', 'kind'):
+                raise BruteError('This system does not support --kind in geterror.')
+            try: kwargs['kind'] = int(sp[1])
+            except ValueError:
+                raise BruteError('Kind must be a number')
+            del sp[:2]
         if len(sp) != 1:
             return self.do_help('geterror')
-        try: print(compile_error(self.url, self.cookie, int(sp[0])))
+        try: sp[0] = int(sp[0])
         except ValueError:
             raise BruteError('Submission ID must be a number')
-        except IndexError:
-            print('Success')
+        ans = compile_error(self.url, self.cookie, sp[0], **kwargs)
+#       except IndexError:
+#           print('Success')
+        if isinstance(ans, bytes):
+            sys.stdout.buffer.raw.write(ans)
+        else:
+            print(ans)
     def do_compilers(self, cmd):
         """
         usage: compilers <task>

@@ -40,7 +40,7 @@ compiler_list      OK      OK      OK          OK          OK         OK      OK
 detect             OK      OK      OK          OK          OK         OK      OK      OK    
 do_action          inherit missing stub        stub        missing    stub    stub    OK    
 download_file      inherit missing stub        stub        stub       missing stub    OK    
-get_samples        OK      missing stub        stub        OK         missing missing OK    
+get_samples        OK      OK      stub        stub        OK         missing missing OK    
 problem_info       inherit missing OK          OK          OK         missing OK      OK    
 read_clar          inherit missing stub        stub        stub       missing OK      OK    
 scores             OK      missing OK          OK          OK         OK      OK      OK    

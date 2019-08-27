@@ -21,3 +21,8 @@ for _w in ['task_list', 'submission_list', 'submission_results', 'task_ids', 'su
     _create_wrapper(_w)
 
 del _create_wrapper, _w
+
+def has_feature(url, cookie, methodname, argname):
+    if not hasattr(url, methodname): return False
+    m = getattr(url, methodname).__func__.__code__
+    return argname in m.co_varnames[:m.co_argcount+m.co_kwonlyargcount]
