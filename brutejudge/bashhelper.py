@@ -14,7 +14,7 @@ def my_quote(i):
 
 cmd.onecmd(' '.join(map(my_quote, sys.argv[1:])))
 
-data2 = pickle.dumps((cmd._url, cmd._cookie, hasattr(cmd, 'no_cheats'))).hex()
+data2 = ''.join(map('%02x'.__mod__, pickle.dumps((cmd._url, cmd._cookie, hasattr(cmd, 'no_cheats')))))
 
 try:
     with open(3, 'w') as file: file.write(data2)

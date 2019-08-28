@@ -172,7 +172,7 @@ class BruteCMD(cmd.Cmd):
         import pkgutil
         try: cmds = list(pkgutil.iter_modules(brutejudge.commands.__path__))
         except: pass
-        else: dir0 |= {'do_'+i.name for i in cmds if not i.name.startswith('_')}
+        else: dir0 |= {'do_'+i[1] for i in cmds if not i.name.startswith('_')}
         return list(dir0)
     def default(self, cmd):
 #       cmd, arg = (cmd.strip()+' ').split(' ', 1)
