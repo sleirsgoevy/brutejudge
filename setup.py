@@ -8,9 +8,9 @@ def get_version():
                 ref = [i for i in file if i.startswith('ref: ')][0][5:].strip()
             if os.path.isfile('.git/'+ref):
                with open('.git/'+ref) as file:
-                   return '(git %s)' % file.read(6)
+                   return 'git-%s' % file.read(6)
     except: pass
-    return '(unknown)'
+    return 'unknown'
 
 setuptools.setup(
     name = 'brutejudge',
