@@ -48,7 +48,7 @@ class JJS(Backend):
             return list(reversed([i['id'] for i in data['data']['runs']])), list(reversed([i['problem']['id'] for i in data['data']['runs']]))
         return [], []
     def submission_results(self, id):
-        code, headers, data = gql_req(self.url, 'query($a:Int!){runs(id:$a){invocationProtocol}}', {"a": int(id)}, {"X-JJS-Auth": self.cookie})
+        code, headers, data = gql_req(self.url, 'query($a:Int!){runs(id:$a){invocationProtocol(filter:{compileLog:false,testData:false,output:false,answer:false})}}', {"a": int(id)}, {"X-JJS-Auth": self.cookie})
 #       print(code, headers, data)
         if not gql_ok(data) or len(data['data']['runs']) != 1:
 #           raise BruteError("Failed to fetch testing protocol")
@@ -87,7 +87,7 @@ class JJS(Backend):
         return st[:1].upper()+st[1:].lower()
     def compile_error(self, id, *, binary=False, kind=None):
         if kind in (None, 1):
-            code, headers, data = gql_req(self.url, 'query($a:Int!){runs(id:$a){invocationProtocol}}', {"a": int(id)}, {"X-JJS-Auth": self.cookie})
+            code, headers, data = gql_req(self.url, 'query($a:Int!){runs(id:$a){invocationProtocol(filter:{compileLog:true,testData:false,output:false,answer:false})}}', {"a": int(id)}, {"X-JJS-Auth": self.cookie})
             if not gql_ok(data) or len(data['data']['runs']) != 1: return None
             prot = json.loads(data['data']['runs'][0]['invocationProtocol'])        
             ans = base64.b64decode(prot.get('compile_stdout', '').encode('ascii'))+base64.b64decode(prot.get('compile_stderr', '').encode('ascii'))
@@ -125,11 +125,11 @@ class JJS(Backend):
             if not binary: ans = ans.decode('utf-8', 'replace')
             return ans
         ans = {}
-        code, headers, data = gql_req(self.url, 'query($a:Int!){runs(id:$a){invocationProtocol}}', {"a": int(id)}, {"X-JJS-Auth": self.cookie})
+        code, headers, data = gql_req(self.url, 'query($a:Int!){runs(id:$a){invocationProtocol(filter:{compileLog:false,testData:true,output:true,answer:true})}}', {"a": int(id)}, {"X-JJS-Auth": self.cookie})
         if not gql_ok(data) or len(data['data']['runs']) != 1: return ans
         proto = json.loads(data['data']['runs'][0]['invocationProtocol'])
         for i, j in enumerate(proto['tests']):
             cur = ans[i + 1] = {}
-            for k1, k2 in (('test_stdin', 'Input'), ('test_stdout', 'Output'), ('test_stderr', 'Stderr')):
+            for k1, k2 in (('test_stdin', 'Input'), ('test_stdout', 'Output'), ('test_stderr', 'Stderr'), ('test_answer', 'Correct')):
                 if k1 in j and j[k1] != None: cur[k2] = deb64(j[k1])
         return ans
