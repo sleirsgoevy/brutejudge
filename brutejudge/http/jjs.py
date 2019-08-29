@@ -1,4 +1,4 @@
-import json, base64
+import json, base64, socket
 from brutejudge.error import BruteError
 from brutejudge.http.base import Backend
 from brutejudge.http.ejudge import do_http, get, post
@@ -17,20 +17,35 @@ class JJS(Backend):
     @staticmethod
     def detect(url):
         sp = url.split('/')
-        return sp[0] in ('http:', 'https:') and not sp[1] and sp[2].endswith(':1779')
+        return sp[0] in ('http+jjs:', 'https+jjs:') and not sp[1]
     def __init__(self, url, login, password):
         Backend.__init__(self)
         url, params = url.split('?')
+        url = url.replace('+jjs', '', 1)
         if url.endswith('/'): url = url[:-1]
         url += '/graphql'
         params = {k: v for k, v in (i.split('=', 1) if '=' in i else (i, None) for i in params.split('&'))}
         contest_id = params['contest']
-        if 'token' in params:
+        if params.get('auth', None) == 'token':
             self.cookie = password
+        elif params.get('auth', None) == 'gettoken':
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.connect('/tmp/jjs-auth-sock')
+            token = b''
+            while True:
+                chk = sock.recv(1024)
+                token += chk
+                if not chk: break
+            token = token.decode('ascii').strip()
+            if not (token.startswith('===') and token.endswith('===')):
+                raise BruteError('Login failed: failed to get token from jjs-auth-sock')
+            self.cookie = token[3:-3]
         else:
             code, headers, data = gql_req(url, 'mutation($a:String!,$b:String!){authSimple(login:$a,password:$b){data}}', {"a": login, "b": password})
 #           print(url, code, headers, data)
             if not gql_ok(data):
+                if 'errors' in data and len(data['errors']) == 1 and 'extensions' in data['errors'][0] and 'errorCode' in data['errors'][0]['extensions']:
+                    raise BruteError('Login failed: '+data['errors'][0]['extensions'])
                 raise BruteError('Login failed')
             self.cookie = data['data']['authSimple']['data']
         self.url = url
