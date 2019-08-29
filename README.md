@@ -33,27 +33,28 @@ Then type `brutejudge` into the prompt.
 (Note: the following table can be obtained by running `python3 coverage.py`)
 
 ```
-                   EJFuse  JJS     Informatics Informatics CodeForces GCJ     PCMS    Ejudge
-clars              inherit missing stub        stub        stub       missing OK      OK    
-compile_error      OK      OK      OK          OK          OK         OK      OK      OK    
-compiler_list      OK      OK      OK          OK          OK         OK      OK      OK    
-detect             OK      OK      OK          OK          OK         OK      OK      OK    
-do_action          inherit missing stub        stub        missing    stub    stub    OK    
-download_file      inherit missing stub        stub        stub       missing stub    OK    
-get_samples        OK      OK      stub        stub        OK         missing missing OK    
-problem_info       inherit missing OK          OK          OK         missing OK      OK    
-read_clar          inherit missing stub        stub        stub       missing OK      OK    
-scores             OK      missing OK          OK          OK         OK      OK      OK    
-status             OK      missing OK          OK          OK         OK      OK      OK    
-stop_caching       inherit inherit OK          OK          OK         OK      OK      OK    
-submission_list    OK      OK      OK          OK          OK         OK      OK      OK    
-submission_results OK      OK      OK          OK          OK         OK      OK      OK    
-submission_score   OK      OK      OK          OK          OK         OK      OK      OK    
-submission_source  OK      OK      OK          OK          OK         OK      OK      OK    
-submission_stats   OK      OK      OK          OK          OK         OK      OK      OK    
-submission_status  OK      OK      OK          OK          OK         OK      OK      OK    
-submit             inherit OK      OK          OK          OK         OK      OK      OK    
-submit_clar        inherit missing stub        stub        stub       missing OK      OK    
-task_ids           OK      OK      OK          OK          OK         OK      OK      OK    
-task_list          OK      OK      OK          OK          OK         OK      OK      OK    
+                   EJFuse  JJS     Informatics Informatics CodeForces GCJ     PCMS    Ejudge 
+clars              inherit missing stub        stub        stub       missing OK      OK     
+compile_error      OK      OK      OK          OK          OK         OK      OK      OK     
+compiler_list      OK      OK      OK          OK          OK         OK      OK      OK     
+detect             OK      OK      OK          OK          OK         OK      OK      OK     
+do_action          inherit missing stub        stub        missing    stub    stub    OK     
+download_file      inherit missing stub        stub        stub       missing stub    OK     
+get_samples        OK      OK      stub        stub        OK         missing missing OK     
+login_type         inherit OK      inherit     inherit     inherit    inherit inherit inherit
+problem_info       inherit missing OK          OK          OK         missing OK      OK     
+read_clar          inherit missing stub        stub        stub       missing OK      OK     
+scores             OK      missing OK          OK          OK         OK      OK      OK     
+status             OK      missing OK          OK          OK         OK      OK      OK     
+stop_caching       inherit inherit OK          OK          OK         OK      OK      OK     
+submission_list    OK      OK      OK          OK          OK         OK      OK      OK     
+submission_results OK      OK      OK          OK          OK         OK      OK      OK     
+submission_score   OK      OK      OK          OK          OK         OK      OK      OK     
+submission_source  OK      OK      OK          OK          OK         OK      OK      OK     
+submission_stats   OK      OK      OK          OK          OK         OK      OK      OK     
+submission_status  OK      OK      OK          OK          OK         OK      OK      OK     
+submit             inherit OK      OK          OK          OK         OK      OK      OK     
+submit_clar        inherit missing stub        stub        stub       missing OK      OK     
+task_ids           OK      OK      OK          OK          OK         OK      OK      OK     
+task_list          OK      OK      OK          OK          OK         OK      OK      OK     
 ```

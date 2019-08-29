@@ -28,3 +28,6 @@ class Backend:
     def may_cache(self):
         return CacheContext(self)
     def stop_caching(self): pass
+    @staticmethod
+    def login_type(url):
+        return ['login', 'pass']
