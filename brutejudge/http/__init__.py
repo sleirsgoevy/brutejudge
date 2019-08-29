@@ -12,6 +12,13 @@ def login(url, login, password):
             return (i(url, login, password), True)
     raise BruteError("Unknown CMS")
 
+def login_type(url):
+    for i in backend_path:
+        try: f = i.detect(url)
+        except Exception: pass
+        if f: return i.login_type(url)
+    return []
+
 def _create_wrapper(name):
     def func(*args, **kwds):
         return getattr(args[0], name)(*args[2:], **kwds)
