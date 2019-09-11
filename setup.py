@@ -17,6 +17,6 @@ setuptools.setup(
     version = get_version(),
     packages = setuptools.find_packages(),
     entry_points = {
-        'console_scripts': ['brutejudge = brutejudge.__main__']
+        'console_scripts': ['brutejudge = brutejudge.__main__:_']
     }
 )

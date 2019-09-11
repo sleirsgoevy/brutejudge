@@ -19,7 +19,7 @@ class JJS(Backend):
         sp = url.split('/')
         return sp[0] in ('http+jjs:', 'https+jjs:') and not sp[1]
     @staticmethod
-    def login_type(self):
+    def login_type(url):
         url, params = url.split('?')
         params = {k: v for k, v in (i.split('=', 1) if '=' in i else (i, None) for i in params.split('&'))}
         if params.get('auth', None) == 'token':
