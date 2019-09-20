@@ -53,9 +53,9 @@ class JJS(Backend):
             token = token.decode('ascii').strip()
             if not (token.startswith('===') and token.endswith('===')):
                 raise BruteError('Login failed: failed to get token from jjs-auth-sock')
-            self.cookie = token[3:-3]
+            self.cookie = 'Branca '+token[3:-3]
         elif params.get('auth', None) == 'guest':
-            self.cookie = None
+            self.cookie = 'Guest'
         else:
             code, headers, data = gql_req(url, 'mutation($a:String!,$b:String!){authSimple(login:$a,password:$b){data}}', {"a": login, "b": password})
 #           print(url, code, headers, data)
@@ -63,7 +63,7 @@ class JJS(Backend):
                 if 'errors' in data and len(data['errors']) == 1 and 'extensions' in data['errors'][0] and 'errorCode' in data['errors'][0]['extensions']:
                     raise BruteError('Login failed: '+data['errors'][0]['extensions'])
                 raise BruteError('Login failed')
-            self.cookie = data['data']['authSimple']['data']
+            self.cookie = 'Branca '+data['data']['authSimple']['data']
         self.url = url
         self.contest = contest_id
     def task_list(self):
