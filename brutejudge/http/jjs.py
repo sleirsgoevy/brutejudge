@@ -164,3 +164,21 @@ class JJS(Backend):
             for k1, k2 in (('test_stdin', 'Input'), ('test_stdout', 'Output'), ('test_stderr', 'Stderr'), ('test_answer', 'Correct')):
                 if k1 in j and j[k1] != None: cur[k2] = deb64(j[k1])
         return ans
+    def scoreboard(self):
+        code, headers, data = gql_req(self.url, 'query{standingsSimple}', None, {"X-Jjs-Auth": self.cookie})
+        if not gql_ok(data): return []
+        standings = json.loads(data['data']['standingsSimple'])
+        ans = []
+        i = 1
+        while str(i) in standings['parties']:
+            cur = standings['parties'][str(i)]
+            i += 1
+            ans.append(('STUB', []))
+            j = 1
+            while str(j) in cur['problems']:
+                cur2 = cur['problems'][str(j)]
+                j += 1
+                if 'empty' in cur2: ans[-1][1].append(None)
+                else:
+                    ans[-1][1].append((cur2['score'], cur2['attempts'] * (1 if cur2['ok'] else -1)))
+        return ans
