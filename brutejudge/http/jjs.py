@@ -178,7 +178,7 @@ class JJS(Backend):
             while str(j) in cur['problems']:
                 cur2 = cur['problems'][str(j)]
                 j += 1
-                if 'empty' in cur2: ans[-1][1].append(None)
+                if cur2['empty']: ans[-1][1].append(None)
                 else:
                     ans[-1][1].append((cur2['score'], cur2['attempts'] * (1 if cur2['ok'] else -1)))
         return ans

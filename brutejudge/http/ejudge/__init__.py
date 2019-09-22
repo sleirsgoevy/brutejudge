@@ -348,7 +348,7 @@ class Ejudge(Backend):
         for i, j in zip(map(lambda x:(int(x[:-1]) if x[-1:] == '#' else int(x)), data[ths.index('Run ID')::w]), data[ths.index('Score')::w]):
             if i == id:
                 if j.startswith('<b>') and j.endswith('</b>'): j = j[3:-4]
-                if (j+' ').isspace(): return None
+                if (j+' ').isspace() or j == 'N/A': return None
                 return int(j)
     def clars(self):
         code, headers, data = self._cache_get(self.urls['clars'])
