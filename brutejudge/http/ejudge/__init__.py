@@ -413,9 +413,13 @@ class Ejudge(Backend):
                     score = None
                     attempts = int(j[0]+'0'+j[1:])
                     ans[-1][1].append((score, attempts))
-                elif j.startswith('<b>') and j.endswith('</b>'):
+                elif j.startswith('<b>') and j.endswith('</b>') and j[3:-4].isnumeric():
                     score = int(j[3:-4])
-                    attempts = None
+                    attempts = float('inf')
+                    ans[-1][1].append((score, attempts))
+                elif j.isnumeric():
+                    score = int(j[3:-4])
+                    attempts = float('-inf')
                     ans[-1][1].append((score, attempts))
                 else:
                     assert False, j

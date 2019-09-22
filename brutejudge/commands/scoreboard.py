@@ -4,7 +4,7 @@ from brutejudge.error import BruteError
 def format_single(score, attempts):
     ans = []
     if score != None: ans.append(str(score))
-    if attempts != None:
+    if attempts != None and attempts * 0 == 0:
         if attempts == 0: ans.append('+')
         elif attempts > 0: ans.append('+'+str(attempts))
         else: ans.append(str(attempts))
