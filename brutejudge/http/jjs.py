@@ -61,7 +61,7 @@ class JJS(Backend):
 #           print(url, code, headers, data)
             if not gql_ok(data):
                 if 'errors' in data and len(data['errors']) == 1 and 'extensions' in data['errors'][0] and 'errorCode' in data['errors'][0]['extensions']:
-                    raise BruteError('Login failed: '+data['errors'][0]['extensions'])
+                    raise BruteError('Login failed: '+data['errors'][0]['extensions']['errorCode'])
                 raise BruteError('Login failed')
             self.cookie = data['data']['authSimple']['data']
         self.url = url
