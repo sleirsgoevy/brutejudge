@@ -16,6 +16,7 @@ def get_urls(main_url):
          'source': main_url + '/download-run/' + sid + '?run_id={run_id}',
          'submission': main_url + '/view-problem-submit/' + sid + '?prob_id={prob_id}',
          'submit': main_url,
+         'standings': main_url + '/standings/' + sid,
          'start_virtual': main_url + '?SID=' + sid[1:] + '&action=144',
          'stop_virtual': main_url + '?SID=' + sid[1:] + '&action=145',
          'download_file': main_url + '?SID=' + sid[1:] + '&prob_id={prob_id}&action=194&file={filename}',

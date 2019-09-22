@@ -391,5 +391,34 @@ class Ejudge(Backend):
         return tests
     def get_samples(self, subm_id):
         return self._get_samples(self.compile_error(subm_id))
+    def scoreboard(self):
+        code, headers, data = self._cache_get(self.urls['standings'])
+        if code != 200:
+            raise BruteError("Failed to fetch scoreboard.")
+        teams = data.decode('utf-8').split('<td  class="st_team">')[1:]
+        teams = [html.unescape(x.split("</td>")[0]) for x in teams]
+        probs = data.decode('utf-8').split('<td  class="st_prob">')[1:]
+        probs = [x.split("</td>")[0] for x in probs]
+        ntasks = len(probs) // len(teams)
+        del teams[-3:]
+        del probs[-3*ntasks:]
+        probs = iter(probs)
+        ans = []
+        for i in teams:
+            ans.append((i, []))
+            for j in range(ntasks):
+                j = next(probs)
+                if j == '&nbsp;': ans[-1][1].append(None)
+                elif j[:1] in ('+', '-'):
+                    score = None
+                    attempts = int(j[0]+'0'+j[1:])
+                    ans[-1][1].append((score, attempts))
+                elif j.startswith('<b>') and j.endswith('</b>'):
+                    score = int(j[3:-4])
+                    attempts = None
+                    ans[-1][1].append((score, attempts))
+                else:
+                    assert False, j
+        return ans
     def stop_caching(self):
         self._get_cache.clear()
