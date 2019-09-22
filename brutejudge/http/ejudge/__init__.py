@@ -142,8 +142,13 @@ class Ejudge(Backend):
         column_count = data.count(b'<th ')
         if column_count == 0: return []
         splitted = data.decode('utf-8').split('<td class="b1">')[1:]
-        data = [x.split("</td>")[0] for x in splitted]
-        return data[::column_count]
+        data = []
+        for x in splitted[::column_count]:
+            x = x.split("</td>")[0]
+            if x.startswith('<a href="') and x.endswith('</a>'):
+                x = x.split('"', 2)[2].split('>', 1)[1][:-4]
+            data.append(html.unescape(x))
+        return data
     def submission_list(self):
         code, headers, data = self._cache_get(self.urls['submissions'])
         if code != 200:
