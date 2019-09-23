@@ -19,7 +19,6 @@ class Informatics(Ejudge):
                         return True
         return False
     def __init__(self, url, login, password):
-        url = url[:-7]
         Backend.__init__(self)
         for proto in ('http', 'https'):
             for domain in ('mccme', 'msk'):
@@ -86,7 +85,9 @@ class Informatics(Ejudge):
         subms_partial = []
         page_cnt = self._request_json(SUBM_LIST_URL%(self.user_id, 100, 1))['metadata']['page_count']
         for i in range(page_cnt):
-            data = self._request_json(SUBM_LIST_URL%(self.user_id, 100, i+1))['data']
+            data = self._request_json(SUBM_LIST_URL%(self.user_id, 100, i+1))
+            if 'data' not in data: break #FIXME
+            data = data['data']
             for i in data:
                 task_id = i['problem']['id']
                 si = i['id']
