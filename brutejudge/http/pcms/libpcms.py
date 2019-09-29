@@ -164,22 +164,7 @@ class PCMS:
         req = self.opener.open(self.base_url+'/links.xhtml')
         if not req.geturl().endswith('/links.xhtml'):
             return None
-        data = req.read().decode('utf-8', 'replace').split('</tr>\n</tbody>\n</table>\n', 1)[1].split('<input type="hidden" ', 1)[0].split('<')
-        ans = data[0]
-        for i in data[1:]:
-            if i.startswith('a href="'):
-                href, i = i[8:].split('">', 1)
-                href = html.unescape(href)
-                ans += '[['+html.escape(urllib.parse.urljoin(self.base_url+'/links.xhtml', href))+' | '+i
-            elif i.startswith('li>'):
-                ans += '* ' + i.split('>', 1)[1]
-            elif any(i.startswith(x) for x in ('br/>', '/h1>', '/h2>', '/h3>', '/p>', '/li>', '/div>')):
-                ans += '\n' + i.split('>', 1)[1]
-            elif i.startswith('/a>'):
-                ans += ']]'+i.split('>', 1)[1]
-            else:
-                ans += i.split('>', 1)[1]
-        return html.unescape(ans.strip())
+        return req.read().decode('utf-8', 'replace').split('</tr>\n</tbody>\n</table>\n', 1)[1].split('<input type="hidden" ', 1)[0], self.base_url+'/links.html'
     def get_clars(self):
         data = self.opener.open(self.base_url + '/questions.xhtml').read().decode('utf-8')
         probs = []

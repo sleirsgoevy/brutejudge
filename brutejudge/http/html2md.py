@@ -1,0 +1,60 @@
+import html, urllib.parse
+
+def do_unescape(s): return html.unescape(' '.join(('_'+s+'_').split()))[1:-1]
+
+def html2md(data, dload_prefix=None, base=None):
+    data = data.split('<')
+    ans = do_unescape(data[0])
+    for i in data[1:]:
+        if i.startswith('a href="'):
+            href, i = i[8:].split('">', 1)
+            href = do_unescape(href)
+            if base != None: href = urllib.parse.urljoin(base, href)
+            if dload_prefix != None and href.startswith(dload_prefix):
+                href = 'file '+href[len(dload_prefix):]
+            ans += '['+href+']('+do_unescape(i)
+        elif any(i.startswith('h%d>'%x) for x in range(1, 7)):
+            d, i = i.split('>', 1)
+            ans += '\n\n'+'#'*int(d[1:])+' '+do_unescape(i)
+        elif i.startswith('li>'):
+            ans += '* ' + do_unescape(i[3:])
+        elif any(i.startswith(x) for x in ('br/>', '/h1>', '/h2>', '/h3>', '/h4>', '/h5>', '/h6>', '/p>', '/li>', '/div>')):
+            ans += '\n\n' + do_unescape(i.split('>', 1)[1])
+        elif i.startswith('/a>'):
+            ans += ')' + do_unescape(i[3:])
+        else:
+            ans += do_unescape(i.split('>', 1)[-1])
+    return '\n\n'.join(i for i in ans.split('\n\n') if i).replace('\n\n\n', '\n\n').strip()
+
+def md2html(data):
+    ans = []
+    uldepth = 0
+    for l in data.split('\n\n'):
+        cur_uldepth = 0
+        if set(l.split(' ', 1)[0]) == {'*'}:
+            hdeep, l = l.split(' ', 1)
+            cur_uldepth = len(hdeep)
+        while uldepth < cur_uldepth:
+            ans.append('<ul>')
+            uldepth += 1
+        while cur_uldepth < uldepth:
+            ans.append('</ul>')
+            uldepth -= 1
+        l = l.replace('\n', ' ')
+        fmt = '<p>%s</p>' if uldepth == 0 else '<li>%s</li>'
+        if set(l.split(' ', 1)[0]) == {'#'}:
+            hdeep, l = l.split(' ', 1)
+            fmt = '<h%d>%%s</h%d>'%(len(hdeep), len(hdeep))
+        l = l.split('[')
+        ll = html.escape(l[0])
+        for i in l[1:]:
+            if ']' not in i:
+                ll += html.escape(i)
+                continue
+            href, i = i.split(']', 1)
+            text = href
+            if i.startswith('(') and ')' in i:
+                text, i = i[1:].split(')')
+            ll += '<a href="'+html.escape(href)+'">'+html.escape(text)+'</a>'+html.escape(i)
+        ans.append(fmt % ll)
+    return '\n'.join(ans)

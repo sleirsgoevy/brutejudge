@@ -2,6 +2,7 @@ import urllib.request, urllib.parse, html, json
 from brutejudge.http.base import Backend
 from brutejudge.error import BruteError
 from brutejudge.http.openerwr import OpenerWrapper
+import brutejudge.http.html2md as html2md
 
 class CodeForces(Backend):
     @staticmethod
@@ -200,25 +201,8 @@ class CodeForces(Backend):
         task = self.task_list()[prob_id]
         data = self.opener.open(self.base_url+'/problem/'+task).read().decode('utf-8', 'replace')
         data = data.split('<div class="property-title">', 1)[1].split('</div><div>', 1)[1]
-        data = data.split('<script type="text/javascript">', 1)[0].split('<')
-        ans = data[0]
-        for i in data[1:]:
-            if i.startswith('a href="'):
-                href, i = i[8:].split('">', 1)
-                dload_prefix = self.urls['download_file'].format(prob_id=id, filename='')
-                href = html.unescape(href)
-                if href.startswith(dload_prefix):
-                    href = 'file '+href[len(dload_prefix):]
-                ans += '[['+html.escape(urllib.parse.urljoin(self.urls['submission'].format(prob_id=id), href))+' | '+i
-            elif i.startswith('li>'):
-                ans += '* ' + i.split('>', 1)[1]
-            elif any(i.startswith(x) for x in ('br/>', '/h1>', '/h2>', '/h3>', '/p>', '/li>', '/div>')):
-                ans += '\n' + i.split('>', 1)[1]
-            elif i.startswith('/a>'):
-                ans += ']]'+i.split('>', 1)[1]
-            else:
-                ans += i.split('>', 1)[1]
-        return ({}, html.unescape(ans.strip()))
+        data = data.split('<script type="text/javascript">', 1)[0]
+        return ({}, html2md.html2md(data, None, self.base_url+'/problems/'+task))
     def download_file(self, *args):
         raise BruteError("File download doesn't exist on CodeForces")
     def submission_score(self, subm_id):

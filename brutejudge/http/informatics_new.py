@@ -3,6 +3,7 @@ from .ejudge import Ejudge
 from .base import Backend
 from .openerwr import OpenerWrapper
 from ..error import BruteError
+import brutejudge.http.html2md as html2md
 
 SUBM_LIST_URL = "/py/problem/0/filter-runs?problem_id=0&from_timestamp=-1&to_timestamp=-1&group_id=0&user_id=%s&lang_id=-1&status_id=-1&statement_id=&count=%d&with_comment=&page=%d"
 
@@ -214,22 +215,10 @@ class Informatics(Ejudge):
         data = self._submission_object(id)
         return data['ejudge_score'] if data['ejudge_score'] >= 0 else None
     def problem_info(self, id):
-        data = self._cache_get("https://informatics.msk.ru/mod/statements/view3.php?chapterid=%d"%id).decode('utf-8', 'replace')
+        url = "/mod/statements/view3.php?chapterid=%d"%id
+        data = self._cache_get(url).decode('utf-8', 'replace')
         if '<div class="legend">' not in data: return ({}, None)
-        data = data.split('<div class="legend">', 1)[1].split('<')
-        ans = data[0]
-        for i in data[1:]:
-            if i.startswith('a href="'):
-                href, i = i[8:].split('">', 1)
-                href = html.unescape(href)
-                ans += '[['+html.escape(urllib.parse.urljoin("https://informatics.msk.ru/mod/statements/view3.php?chapterid=%d"%id, href))+' | '+i
-            elif any(i.startswith(x) for x in ('br/>', '/h1', '/h2', '/h3', '/p')):
-                ans += '\n' + i.split('>', 1)[1]
-            elif i.startswith('/a>'):
-                ans += ']]'+i.split('>', 1)[1]
-            else:
-                ans += i.split('>', 1)[1]
-        return ({}, html.unescape(ans.strip()))
+        return ({}, html2md.html2md(data.split('<div class="legend">', 1)[1].split("<div id='submit' ", 1)[0], None, "https://informatics.msk.ru"+url))
     def download_file(self, prob_id, filename):
         raise BruteError("File download doesn't exist on informatics.msk.ru")
     def clars(self):

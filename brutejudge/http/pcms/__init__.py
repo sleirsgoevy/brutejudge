@@ -2,6 +2,7 @@ import collections
 from .libpcms import PCMS as LPCMS
 from brutejudge.http.base import Backend
 from brutejudge.error import BruteError
+import brutejudge.http.html2md as html2md
 
 class PCMS(Backend):
     @staticmethod
@@ -153,7 +154,8 @@ class PCMS(Backend):
     def do_action(self, *args):
         raise BruteError("Not implemented on PCMS")
     def problem_info(self, task_id):
-        return ({}, self._cache_call(self.pcms.get_links))
+        html, base = self._cache_call(self.pcms.get_links)
+        return ({}, html2md.html2md(html, None, base))
     def submission_score(self, subm_id):
         task, attempt = self._decode_subm_id(subm_id)
         subms = self._cache_call(self.pcms.get_submissions)

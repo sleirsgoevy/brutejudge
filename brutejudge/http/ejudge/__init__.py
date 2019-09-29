@@ -1,5 +1,5 @@
 import ssl, socket, html, collections, urllib.parse
-import brutejudge.http.ejudge.ej371, brutejudge.http.ejudge.ej373
+import brutejudge.http.ejudge.ej371, brutejudge.http.ejudge.ej373, brutejudge.http.html2md as html2md
 from brutejudge.http.base import Backend
 from brutejudge.error import BruteError
 
@@ -309,25 +309,8 @@ class Ejudge(Backend):
             v = v.split('<')
             v = v[0]+''.join(i.split('>', 1)[1] for i in v[1:])
             stats[k.rsplit(':', 1)[0].strip()] = html.unescape(v.strip())
-        data = data2.split('<form method="post" enctype="multipart/form-data" action="', 1)[0].rsplit('<h3>', 1)[0].split('<')
-        ans = data[0]
-        for i in data[1:]:
-            if i.startswith('a href="'):
-                href, i = i[8:].split('">', 1)
-                dload_prefix = self.urls['download_file'].format(prob_id=id, filename='')
-                href = html.unescape(href)
-                if href.startswith(dload_prefix):
-                    href = 'file '+href[len(dload_prefix):]
-                ans += '[['+html.escape(urllib.parse.urljoin(self.urls['submission'].format(prob_id=id), href))+' | '+i
-            elif i.startswith('li>'):
-                ans += '* ' + i.split('>', 1)[1]
-            elif any(i.startswith(x) for x in ('br/>', '/h1>', '/h2>', '/h3>', '/p>', '/li>', '/div>')):
-                ans += '\n' + i.split('>', 1)[1]
-            elif i.startswith('/a>'):
-                ans += ']]'+i.split('>', 1)[1]
-            else:
-                ans += i.split('>', 1)[1]
-        return (stats, html.unescape(ans.strip()))
+        data = data2.split('<form method="post" enctype="multipart/form-data" action="', 1)[0].rsplit('<h3>', 1)[0]
+        return (stats, html2md.html2md(data, self.urls['download_file'].format(prob_id=id, filename=''), self.urls['submission'].format(prob_id=id)))
     def download_file(self, prob_id, filename):
         code, headers, data = self._cache_get(self.urls['download_file'].format(prob_id=prob_id, filename=filename))
         if code == 404:
