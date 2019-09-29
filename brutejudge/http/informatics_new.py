@@ -240,5 +240,7 @@ class Informatics(Ejudge):
         raise BruteError("Clarifications don't exits on informatics.msk.ru")
     def get_samples(self, subm_id):
         raise BruteError("Can't get samples on informatics.msk.ru")
+    def scoreboard(self):
+        raise BruteError("Scoreboard is not supported on informatics.msk.ru")
     def stop_caching(self):
         self._cache.clear()    
