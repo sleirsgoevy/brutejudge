@@ -1,8 +1,8 @@
 import collections
 from .libpcms import PCMS as LPCMS
-from brutejudge.http.base import Backend
+from brutejudge._http.base import Backend
 from brutejudge.error import BruteError
-import brutejudge.http.html2md as html2md
+import brutejudge._http.html2md as html2md
 
 class PCMS(Backend):
     @staticmethod

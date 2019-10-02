@@ -1,3 +1,10 @@
+import sys
+
+if '--bash' in sys.argv:
+    import brutejudge.bashhelper
+    brutejudge.bashhelper.main()
+    exit(0)
+
 from brutejudge.cmd import BruteCMD
 import cmd, builtins
 

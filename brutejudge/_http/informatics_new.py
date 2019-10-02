@@ -3,7 +3,7 @@ from .ejudge import Ejudge
 from .base import Backend
 from .openerwr import OpenerWrapper
 from ..error import BruteError
-import brutejudge.http.html2md as html2md
+import brutejudge._http.html2md as html2md
 
 SUBM_LIST_URL = "/py/problem/0/filter-runs?problem_id=0&from_timestamp=-1&to_timestamp=-1&group_id=0&user_id=%s&lang_id=-1&status_id=-1&statement_id=&count=%d&with_comment=&page=%d"
 

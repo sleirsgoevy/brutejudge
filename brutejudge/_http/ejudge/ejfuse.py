@@ -1,7 +1,7 @@
-from brutejudge.http.ejudge import Ejudge, do_http, get, post
-from brutejudge.http.ejudge.ej371 import get_urls
+from brutejudge._http.ejudge import Ejudge, do_http, get, post
+from brutejudge._http.ejudge.ej371 import get_urls
 from brutejudge.error import BruteError
-from brutejudge.http.base import Backend
+from brutejudge._http.base import Backend
 import json, base64, collections
 
 def mbjson(x):

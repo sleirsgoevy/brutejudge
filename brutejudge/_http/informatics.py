@@ -3,7 +3,7 @@ from .ejudge import Ejudge
 from .base import Backend
 from .openerwr import OpenerWrapper
 from ..error import BruteError
-import brutejudge.http.html2md as html2md
+import brutejudge._http.html2md as html2md
 
 class Informatics(Ejudge):
     @staticmethod

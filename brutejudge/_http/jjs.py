@@ -1,7 +1,7 @@
 import json, base64, socket
 from brutejudge.error import BruteError
-from brutejudge.http.base import Backend
-from brutejudge.http.ejudge import do_http, get, post
+from brutejudge._http.base import Backend
+from brutejudge._http.ejudge import do_http, get, post
 
 def gql_req(url, query, params, headers={}):
     headers = dict(headers)

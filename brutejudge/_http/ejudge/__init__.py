@@ -1,6 +1,6 @@
 import ssl, socket, html, collections, urllib.parse
-import brutejudge.http.ejudge.ej371, brutejudge.http.ejudge.ej373, brutejudge.http.html2md as html2md
-from brutejudge.http.base import Backend
+import brutejudge._http.ejudge.ej371, brutejudge._http.ejudge.ej373, brutejudge._http.html2md as html2md
+from brutejudge._http.base import Backend
 from brutejudge.error import BruteError
 
 def do_http(url, method, headers, data=b''):

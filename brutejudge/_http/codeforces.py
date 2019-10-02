@@ -1,8 +1,8 @@
 import urllib.request, urllib.parse, html, json
-from brutejudge.http.base import Backend
+from brutejudge._http.base import Backend
 from brutejudge.error import BruteError
-from brutejudge.http.openerwr import OpenerWrapper
-import brutejudge.http.html2md as html2md
+from brutejudge._http.openerwr import OpenerWrapper
+import brutejudge._http.html2md as html2md
 
 class CodeForces(Backend):
     @staticmethod

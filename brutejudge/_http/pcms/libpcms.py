@@ -5,7 +5,7 @@ class PCMSRedirectHandler(urllib.request.HTTPRedirectHandler):
         newurl = newurl.split(';', 1)[0]
         return urllib.request.HTTPRedirectHandler.redirect_request(self, req, fp, code, msg, headers, newurl)
 
-try: from brutejudge.http.openerwr import OpenerWrapper
+try: from brutejudge._http.openerwr import OpenerWrapper
 except ImportError:
     def OpenerWrapper(x): return x
 
