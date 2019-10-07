@@ -70,11 +70,12 @@ def io_server(brute, sock, auth_token):
         cstdin, stdin = os.pipe()
         stdout, cstdout = os.pipe()
         stderr, cstderr = os.pipe()
+    command = eval(command)
     efd, efd_w = os.pipe()
     threading.Thread(target=io_server_thread, args=(sock, stdin, stdout, stderr, efd), daemon=True).start()
-    cstdin_f = open(cstdin, 'rb', 1, closefd=False)
-    cstdout_f = open(cstdout, 'wb', 1, closefd=False)
-    cstderr_f = open(cstderr, 'wb', 1, closefd=False)
+    cstdin_f = open(cstdin, 'rb', -1, closefd=False)
+    cstdout_f = open(cstdout, 'wb', -1, closefd=False)
+    cstderr_f = open(cstderr, 'wb', -1, closefd=False)
     sys.stdin.buffer._tld.value = cstdin_f
     sys.stdout.buffer._tld.value = cstdout_f
     sys.stderr.buffer._tld.value = cstderr_f
@@ -143,7 +144,7 @@ def io_client(port, auth_token, cmd):
         mode = 'pty'
     else:
         mode = 'pipe'
-    sock.sendall(('%s %s\n'%(mode, cmd)).encode('ascii'))
+    sock.sendall(('%s %r\n'%(mode, cmd)).encode('ascii'))
     if mode == 'pty':
         old = tty.tcgetattr(0)
         tty.setraw(0)
