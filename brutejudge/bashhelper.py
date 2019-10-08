@@ -1,5 +1,10 @@
 import socket, threading, os, pty, tty, select, sys, shlex, subprocess, io, signal
 
+mustexit = None
+
+class UnbufferedStream(io.FileIO):
+    def read1(self, x=-1): return self.read(x)
+
 def readline(sock):
     ans = b''
     while not ans.endswith(b'\n'):
@@ -24,6 +29,7 @@ def io_server_thread(sock, stdin, stdout, stderr, efd):
                     if not data: fd_set.remove(i)
                     l = os.write(stdin, data)
                     sock.recv(l)
+                    if b'\3' in data[:l]: os.kill(os.getpid(), signal.SIGINT)
                 elif i == stdout:
                     try: data = os.read(stdout, 1024)
                     except OSError: data = b''
@@ -73,9 +79,13 @@ def io_server(brute, sock, auth_token):
     command = eval(command)
     efd, efd_w = os.pipe()
     threading.Thread(target=io_server_thread, args=(sock, stdin, stdout, stderr, efd), daemon=True).start()
-    cstdin_f = open(cstdin, 'rb', -1, closefd=False)
-    cstdout_f = open(cstdout, 'wb', -1, closefd=False)
-    cstderr_f = open(cstderr, 'wb', -1, closefd=False)
+    if mode == 'pty':
+        do_open = UnbufferedStream
+    else:
+        do_open = open
+    cstdin_f = do_open(cstdin, 'rb', closefd=False)
+    cstdout_f = do_open(cstdout, 'wb', closefd=False)
+    cstderr_f = do_open(cstderr, 'wb', closefd=False)
     sys.stdin.buffer._tld.value = cstdin_f
     sys.stdout.buffer._tld.value = cstdout_f
     sys.stderr.buffer._tld.value = cstderr_f
@@ -89,6 +99,7 @@ def io_server(brute, sock, auth_token):
         else:
             print(e.args, file=sys.stderr)
     except:
+        if mustexit != None: exit(mustexit)
         sys.excepthook(*sys.exc_info())
         exitstatus = 1
     finally:
@@ -108,9 +119,9 @@ def io_server_main(brute, sock, auth_token):
     while True: io_server(brute, sock.accept()[0], auth_token)
 
 def hook_stdio():
-    sys.stdin = io.TextIOWrapper(TLDProxy(sys.stdin.buffer))
-    sys.stdout = io.TextIOWrapper(TLDProxy(sys.stdout.buffer))
-    sys.stderr = io.TextIOWrapper(TLDProxy(sys.stderr.buffer))
+    sys.stdin = io.TextIOWrapper(TLDProxy(sys.stdin.buffer), line_buffering=True)
+    sys.stdout = io.TextIOWrapper(TLDProxy(sys.stdout.buffer), line_buffering=True)
+    sys.stderr = io.TextIOWrapper(TLDProxy(sys.stderr.buffer), line_buffering=True)
     import os
     os_open = os.open
     def gp_open(file, *args, **kwds):
@@ -124,10 +135,14 @@ def start_io_server(brute, auth_token):
     sock = socket.socket()
     sock.bind(('127.0.0.1', 0))
     sock.listen(1)
-    threading.Thread(target=io_server_main, args=(brute, sock, auth_token), daemon=True).start()
-    run_bash(sock.getsockname(), auth_token)
+    threading.Thread(target=run_bash, args=(sock.getsockname(), auth_token), daemon=True).start()
+    try: io_server_main(brute, sock, auth_token)
+    except:
+        if mustexit != None: exit(mustexit)
+        raise
 
 def run_bash(arg, auth_token):
+    global mustexit
     port = arg[1]
     env = dict(os.environ)
     for i in ('BASH_FUNC_%s%%%%', 'BASH_FUNC_%s()', '%s'):
@@ -135,7 +150,8 @@ def run_bash(arg, auth_token):
     ppath = os.environ.get('PYTHONPATH', None)
     ppath = os.path.split(os.path.split(__file__)[0])[0]+(':'+ppath if ppath != None else '')
     env['PYTHONPATH'] = ppath
-    exit(subprocess.call('bash', env=env))
+    mustexit = subprocess.call('bash', env=env)
+    os.kill(os.getpid(), signal.SIGINT)
 
 def io_client(port, auth_token, cmd):
     sock = socket.create_connection(('127.0.0.1', port))
