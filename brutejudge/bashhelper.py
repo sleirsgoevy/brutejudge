@@ -29,7 +29,7 @@ def io_server_thread(sock, stdin, stdout, stderr, efd):
                     if not data: fd_set.remove(i)
                     l = os.write(stdin, data)
                     sock.recv(l)
-                    if b'\3' in data[:l]: os.kill(os.getpid(), signal.SIGINT)
+                    if os.isatty(stdin) and b'\3' in data[:l]: os.kill(os.getpid(), signal.SIGINT)
                 elif i == stdout:
                     try: data = os.read(stdout, 1024)
                     except OSError: data = b''
