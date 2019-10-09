@@ -237,7 +237,7 @@ class Ejudge(Backend):
             import html
             ans.append(html.unescape(i))
         return '\n'.join(ans)
-    def submission_status(self, id):
+    def _submission_field(self, id, field):
         code, headers, data = self._cache_get(self.urls['submissions'])
         if code != 200:
             raise BruteError("Failed to fetch submission list.")
@@ -246,8 +246,11 @@ class Ejudge(Backend):
         if w == 0: return [], []
         splitted = data.decode('utf-8').split('<td class="b1">')[1:]
         data = [x.split("</td>")[0] for x in splitted]
-        for i, j in zip(map(lambda x:(int(x[:-1]) if x[-1:] == '#' else int(x)), data[ths.index('Run ID')::w]), data[ths.index('Result')::w]):
+        if field not in ths: return None
+        for i, j in zip(map(lambda x:(int(x[:-1]) if x[-1:] == '#' else int(x)), data[ths.index('Run ID')::w]), data[ths.index(field)::w]):
             if i == id: return j
+    def submission_status(self, id):
+        return self._submission_field(id, 'Result')
     def submission_source(self, id):
         code, headers, data = self._cache_get(self.urls['source'].format(run_id=id))
         rhd = dict(headers)
@@ -277,7 +280,7 @@ class Ejudge(Backend):
             b, c = html.unescape(b).split(' - ')
             ans.append((int(a), b.strip(), c.strip()))
         return ans
-    def submission_stats(self, id):
+    def _submission_stats(self, id):
         code, headers, data = self._cache_get(self.urls['protocol'].format(run_id=id))
         data = data.decode('utf-8')
         if '<big>' in data:
@@ -296,6 +299,15 @@ class Ejudge(Backend):
             return (ans, data)
         else:
             return ({}, None)
+    def submission_stats(self, id):
+        ans1, ans2 = self._submission_stats(id)
+        tp = self._submission_field(id, 'Tests passed')
+        if tp != None and not (tp+' ').isspace() and tp.strip() != '&nbsp;': tp = int(tp)
+        else: tp = None
+        if tp != None:
+            if 'tests' not in ans1: ans1['tests'] = {}
+            ans1['tests']['success'] = tp
+        return (ans1, ans2)
     def problem_info(self, id):
         code, headers, data = self._cache_get(self.urls['submission'].format(prob_id=id))
         data = data.decode('utf-8')
@@ -319,20 +331,11 @@ class Ejudge(Backend):
             raise BruteError("Error downloading.")
         return data
     def submission_score(self, id):
-        code, headers, data = self._cache_get(self.urls['submissions'])
-        if code != 200:
-            raise BruteError("Failed to fetch submission list.")
-        ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8').split('<th class="b1">')[1:]]
-        w = len(ths)
-        if w == 0: return [], []
-        splitted = data.decode('utf-8').split('<td class="b1">')[1:]
-        data = [x.split("</td>")[0] for x in splitted]
-        if 'Score' not in ths: return None
-        for i, j in zip(map(lambda x:(int(x[:-1]) if x[-1:] == '#' else int(x)), data[ths.index('Run ID')::w]), data[ths.index('Score')::w]):
-            if i == id:
-                if j.startswith('<b>') and j.endswith('</b>'): j = j[3:-4]
-                if (j+' ').isspace() or j == 'N/A': return None
-                return int(j)
+        j = self._submission_field(id, 'Score')
+        if j == None: return None
+        if j.startswith('<b>') and j.endswith('</b>'): j = j[3:-4]
+        if (j+' ').isspace() or j == 'N/A': return None
+        return int(j)
     def clars(self):
         code, headers, data = self._cache_get(self.urls['clars'])
         ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8').split('<th class="b1">')[1:]]
