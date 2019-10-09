@@ -380,7 +380,7 @@ class Ejudge(Backend):
             raise BruteError("Failed to fetch scoreboard.")
         teams = data.decode('utf-8').split('<td  class="st_team">')[1:]
         teams = [html.unescape(x.split("</td>")[0]) for x in teams]
-        probs = data.decode('utf-8').split('<td  class="st_prob">')[1:]
+        probs = data.decode('utf-8').split('<td  class="st_prob')[1:]
         probs = [x.split("</td>")[0] for x in probs]
         ntasks = len(probs) // len(teams)
         del teams[-3:]
@@ -390,7 +390,7 @@ class Ejudge(Backend):
         for i in teams:
             ans.append((i, []))
             for j in range(ntasks):
-                j = next(probs)
+                j = next(probs).split('>', 1)[1]
                 if j == '&nbsp;': ans[-1][1].append(None)
                 elif j[:1] in ('+', '-'):
                     score = None
@@ -401,7 +401,7 @@ class Ejudge(Backend):
                     attempts = float('inf')
                     ans[-1][1].append((score, attempts))
                 elif j.isnumeric():
-                    score = int(j[3:-4])
+                    score = int(j)
                     attempts = float('-inf')
                     ans[-1][1].append((score, attempts))
                 else:
