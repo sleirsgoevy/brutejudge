@@ -1,7 +1,7 @@
-def check_exists(file):
+def check_exists(file, options=set()):
     return True
 
-def read_file(name):
+def read_file(name, options=set()):
     return name
 
 def get_fmt_name(s):
@@ -12,6 +12,7 @@ def get_fmt_name(s):
     spec = 'd'
     if 'unsigned' in s: spec = 'u'
     if 'char' in s: spec = 'c'
+    if 'char' in s and '*' in s or 'char*' in s: spec = 's'
     if 'float' in s: spec = 'f'
     if 'double' in s: spec = 'lf'
     if '__char' in s: spec = 'c'
@@ -19,14 +20,14 @@ def get_fmt_name(s):
     if '__unsigned' in s: spec = 'u'
     if '__hex' in s: spec = 'x'
     mod = ''
-    if 'char' in s and spec != 'c': mod = 'hh'
+    if 'char' in s and spec not in ('c', 's'): mod = 'hh'
     else: mod += 'h'*s.count('short')+'l'*s.count('long')
     return '%'+mod+spec
 
 def get_spec_name(s):
     return ' '.join(i for i in s.split() if i not in ('__char', '__int', '__unsigned', '__hex') and not i.startswith('__%'))
 
-def format(s):
+def format(s, options=set(), stdio=True):
     args, exprs = s.split(':', 1)
     args, retvals = args.rsplit('->', 1)
     args = [i.strip() for i in args.split(',')]
@@ -35,6 +36,8 @@ def format(s):
     code = '''\
 #include <stdio.h>
 
+''' if stdio else ''
+    code += '''\
 int main(void)
 {
 '''
@@ -47,13 +50,16 @@ int main(void)
     for i in args:
         code += ', &'+i.rsplit(' ', 1)[1]
     code += ');\n'
-    code += '    printf("'
-    b = False
-    for i in retvals:
-        if b: code += ' '
-        else: b = True
-        code += get_fmt_name(i)
-    code += '\\n", '+exprs+');\n'
+    if len(retvals) == 1 and get_fmt_name(retvals[0]) == '%s':
+        code += '    puts('+exprs+');\n'
+    else:
+        code += '    printf("'
+        b = False
+        for i in retvals:
+            if b: code += ' '
+            else: b = True
+            code += get_fmt_name(i)
+        code += '\\n", '+exprs+');\n'
     code += '''\
     return 0;
 }

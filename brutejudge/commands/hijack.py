@@ -1,6 +1,6 @@
 import brutejudge.cheats
 from brutejudge.error import BruteError
-from brutejudge.http.ejudge import Ejudge
+from brutejudge._http.ejudge import Ejudge
 
 def do_hijack(self, cmd):
     """

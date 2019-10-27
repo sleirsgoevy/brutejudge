@@ -1,6 +1,6 @@
 import sys, os.path
 
-def read_file(name, includes=None):
+def read_file(name, options=set(), includes=None):
     name = os.path.realpath(name)
     if includes == None:
         includes = set()
@@ -19,23 +19,29 @@ def read_file(name, includes=None):
     includes.remove(name)
     return ans
 
-def format(original):
+def format(original, options=set(), cplusplus=True):
     i = 0
-    s = original.replace('; ', ';').replace(';', '; ').replace("'; '", "';'").split('\n')
+    s = [i.rstrip() for i in original.split('\n')]
     for i, j in enumerate(s):
         stripped = j.strip()
-        if stripped in ('public:', 'private:', 'protected:'):
+        if cplusplus and '-mods' not in options and stripped in ('public:', 'private:', 'protected:'):
             l = j.find(stripped)
             while l % 4 != 1:
                 l += 1
             s[i] = ' ' * l + stripped
+        if (not cplusplus and '-mainvoid' not in options) and j == 'int main()':
+            s[i] = 'int main(void)'
+        if '+cexpr' in options and j.startswith('#pragma cexpr '):
+            from .format_cexpr import format as format_cexpr
+            s[i] = format_cexpr(j[14:], options, stdio=False).strip()
     s = '\n'.join(s)
     while ' \n' in s: s = s.replace(' \n', '\n')
     i = 0
-    while i < len(s):
-        for j in ('if', 'while', 'for', 'switch'):
-            if s[i:i+len(j)+1] == j + '(':
-                s = s[:i+len(j)] + ' ' + s[i+len(j):]
-                break
-        else: i += 1
+    if '-ifspc' not in options:
+        while i < len(s):
+            for j in ('if', 'while', 'for', 'switch'):
+                if s[i:i+len(j)+1] == j + '(':
+                    s = s[:i+len(j)] + ' ' + s[i+len(j):]
+                    break
+            else: i += 1
     return s

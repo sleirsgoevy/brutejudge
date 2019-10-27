@@ -3,7 +3,7 @@ from brutejudge.commands.asubmit import get_possible_lang_id
 from brutejudge.commands.astatus import still_running
 from brutejudge.commands.samples import get_samples
 from brutejudge.http import task_list, submit, submission_list, submission_status, compile_error
-from brutejudge.http.codeforces import CodeForces
+from brutejudge._http.codeforces import CodeForces
 from brutejudge.error import BruteError
 import shlex, sys, random
 

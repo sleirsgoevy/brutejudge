@@ -1,9 +1,9 @@
 import sys
 
-def read_file(path):
+def read_file(path, options=set()):
     with open(path) as file: return file.read()
 
-def format(orig):
+def format(orig, options=set()):
     data = orig.split('\n')
     i = 0
     while i < len(data):

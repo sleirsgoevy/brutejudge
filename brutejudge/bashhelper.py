@@ -12,7 +12,7 @@ def readline(sock):
         except socket.error: return ''
         ans += chunk
         if chunk == b'': return ''
-    return ans.decode('ascii')[:-1]
+    return ans.decode('utf-8')[:-1]
 
 def io_server_thread(sock, stdin, stdout, stderr, efd):
     try:
@@ -20,7 +20,7 @@ def io_server_thread(sock, stdin, stdout, stderr, efd):
         while True:
             l = select.select(list(fd_set), [], [])[0]
             if l == [efd]:
-                sock.sendall(('exit %d\n'%os.read(efd, 1)[0]).encode('ascii'))
+                sock.sendall(('exit %d\n'%os.read(efd, 1)[0]).encode('utf-8'))
                 sock.close()
                 break
             for i in l:
@@ -34,12 +34,12 @@ def io_server_thread(sock, stdin, stdout, stderr, efd):
                     try: data = os.read(stdout, 1024)
                     except OSError: data = b''
                     if not data: fd_set.remove(i)
-                    sock.sendall(('stdout %d\n'%len(data)).encode('ascii')+data)
+                    sock.sendall(('stdout %d\n'%len(data)).encode('utf-8')+data)
                 elif i == stderr:
                     try: data = os.read(stderr, 1024)
                     except OSError: data = b''
                     if not data: fd_set.remove(i)
-                    sock.sendall(('stderr %d\n'%len(data)).encode('ascii')+data)
+                    sock.sendall(('stderr %d\n'%len(data)).encode('utf-8')+data)
     except socket.error: pass
     finally:
         for i in {stdin, stdout, stderr, efd}: os.close(i)
@@ -155,12 +155,12 @@ def run_bash(arg, auth_token):
 
 def io_client(port, auth_token, cmd):
     sock = socket.create_connection(('127.0.0.1', port))
-    sock.sendall((auth_token+'\n').encode('ascii'))
+    sock.sendall((auth_token+'\n').encode('utf-8'))
     if sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty():
         mode = 'pty'
     else:
         mode = 'pipe'
-    sock.sendall(('%s %r\n'%(mode, cmd)).encode('ascii'))
+    sock.sendall(('%s %r\n'%(mode, cmd)).encode('utf-8'))
     if mode == 'pty':
         old = tty.tcgetattr(0)
         tty.setraw(0)

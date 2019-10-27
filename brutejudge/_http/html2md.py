@@ -25,6 +25,10 @@ def html2md(data, dload_prefix=None, base=None):
             ans += '\n\n' + do_unescape(i.split('>', 1)[1], is_code)
         elif i.startswith('/a>'):
             ans += ')' + do_unescape(i[3:], is_code)
+        elif i.startswith('sub>'):
+            ans += '[' + do_unescape(i[4:], is_code)
+        elif i.startswith('/sub>'):
+            ans += ']' + do_unescape(i[5:], is_code)
         else:
             if i.startswith('/pre>'):
                 ans += '\n```'

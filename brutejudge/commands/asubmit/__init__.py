@@ -17,7 +17,10 @@ def get_possible_lang_id(self, lang_names, task_id):
     lang_id.append(None)
     return lang_id[0]
 
-def do_asubmit(self, cmd):
+def check_exists(fname, options=set()):
+    return os.path.exists(fname) or '-exist' in options
+
+def do_asubmit(self, cmd, afmt=False):
     """
     usage: asubmit [-w] [-x <extension>] <task> <lang_id> <file>
 
@@ -25,12 +28,12 @@ def do_asubmit(self, cmd):
     Uses a specific style fixer if -x is specified.
     Waits until testing ends if -w is specified.
     """
-    modname = None
+    modname = ''
     wait = False
     sp = shlex.split(cmd)
     if len(sp) not in range(3, 7):
         return self.do_help('asubmit')
-    if sp[0] == '-w':
+    if not afmt and sp[0] == '-w':
         wait = True
         del sp[0]
     if len(sp) not in (3, 5):
@@ -39,7 +42,7 @@ def do_asubmit(self, cmd):
         modname = sp[1]
         del sp[:2]
         if modname[:1] == '.': modname = 'brutejudge.commands.asubmit.format_'+modname[1:]
-    if len(sp) != 3:
+    if len(sp) != (1 if afmt else 3):
         return self.do_help('asubmit')
     with may_cache(self.url, self.cookie):
         tasks = task_list(self.url, self.cookie)
@@ -52,19 +55,21 @@ def do_asubmit(self, cmd):
             name = sp[2]
             module = None
             ext = os.path.splitext(name)[1][1:]
-            if modname == None: modname = 'brutejudge.commands.asubmit.format_'+ext
+            modname, *modargs = modname.split(',')
+            modargs = set(modargs)
+            if not modname: modname = 'brutejudge.commands.asubmit.format_'+ext
             try:
                 module = __import__(modname, fromlist=True)
             except ImportError: pass
-            if not getattr(module, 'check_exists', os.path.exists)(name):
+            if not getattr(module, 'check_exists', check_exists)(name, modargs):
                 raise BruteError("File not found.")
             if hasattr(module, 'read_file'):
-                data = module.read_file(name)
+                data = module.read_file(name, modargs)
             else:
                 with open(name, 'rb') as file:
                     data = file.read()
             if hasattr(module, 'format'):
-                data = module.format(data)
+                data = module.format(data, modargs)
         except UnicodeDecodeError:
             raise BruteError("File is binary.")
         before = submission_list(self.url, self.cookie)[0]

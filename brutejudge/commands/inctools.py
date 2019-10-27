@@ -1,7 +1,7 @@
 import brutejudge.cheats, io, base64, gzip, shlex, sys, os.path, ast
 from brutejudge.commands.incat import incat, base64_filter, IncatCompileError
 from brutejudge.http import task_list, task_ids
-from brutejudge.http.ejudge import Ejudge
+from brutejudge._http.ejudge import Ejudge
 from brutejudge.error import BruteError
 
 def easy_incat(self, task, filepath, custom_include=None, binary=True):

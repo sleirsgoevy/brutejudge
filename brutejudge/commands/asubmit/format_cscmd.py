@@ -1,9 +1,9 @@
 import brutejudge.cheats
 
-def check_exists(file):
+def check_exists(file, options=set()):
     return True
 
-def read_file(cmd):
+def read_file(cmd, options=set()):
     fmt = ''
     for i in cmd:
         if ord(i) in range(32, 127) and i != '\\' and i != '"' or i.isalnum():

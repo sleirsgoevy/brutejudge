@@ -1,8 +1,8 @@
-def check_exists(file):
+def check_exists(file, options=set()):
     return True
 
-def read_file(name):
+def read_file(name, options=set()):
     return name
 
-def format(s):
+def format(s, options=set()):
     return s
