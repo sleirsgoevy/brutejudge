@@ -4,6 +4,16 @@ def do_unescape(s, code=False):
     if code: return html.unescape(s)
     return html.unescape(' '.join(('_'+s+'_').split()))[1:-1]
 
+def validate_tag(data):
+    if data.startswith('/'): data = data[1:]
+    i = 0
+    while i < len(data):
+        j = max(data.find("'", i) % (len(data) + 1), data.find('"', i) % (len(data) + 1))
+        if not set(data[i:j]).issubset(set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ- =')): return False
+        if j == len(data): return True
+        i = data.find(data[j], j + 1) % (len(data) + 2) + 1
+    return i == len(data)
+
 def html2md(data, dload_prefix=None, base=None):
     data = data.split('<')
     ans = do_unescape(data[0])
@@ -29,6 +39,10 @@ def html2md(data, dload_prefix=None, base=None):
             ans += '[' + do_unescape(i[4:], is_code)
         elif i.startswith('/sub>'):
             ans += ']' + do_unescape(i[5:], is_code)
+        elif i.startswith('sup>'):
+            ans += '**(' + do_unescape(i[4:], is_code)
+        elif i.startswith('/sup>'):
+            ans += ')' + do_unescape(i[5:], is_code)
         else:
             if i.startswith('/pre>'):
                 ans += '\n```'
@@ -36,7 +50,10 @@ def html2md(data, dload_prefix=None, base=None):
             elif i.startswith('pre>'):
                 ans += '```\n'
                 is_code = True
-            ans += do_unescape(i.split('>', 1)[-1], is_code)
+            if '>' not in i or not validate_tag(i.split('>', 1)[0]):
+                ans += '<' + do_unescape(i, is_code)
+            else:
+                ans += do_unescape(i.split('>', 1)[-1], is_code)
     return '\n\n'.join(i for i in ans.split('\n\n') if i).replace('\n\n\n', '\n\n').strip()
 
 def md2html(data):

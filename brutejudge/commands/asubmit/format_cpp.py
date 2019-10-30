@@ -29,8 +29,8 @@ def format(original, options=set(), cplusplus=True):
             while l % 4 != 1:
                 l += 1
             s[i] = ' ' * l + stripped
-        if (not cplusplus and '-mainvoid' not in options) and j == 'int main()':
-            s[i] = 'int main(void)'
+        if (not cplusplus and '-funcvoid' not in options) and j == stripped and j.endswith('()'):
+            s[i] = j[:-2]+'(void)'
         if '+cexpr' in options and j.startswith('#pragma cexpr '):
             from .format_cexpr import format as format_cexpr
             s[i] = format_cexpr(j[14:], options, stdio=False).strip()
