@@ -61,7 +61,7 @@ class TLDProxy:
 
 tld_devtty = threading.local()
 
-def io_server(brute, sock, auth_token):
+def io_server(brute, sock, auth_token, tty_conf):
     auth = readline(sock)
     if auth != auth_token:
         sock.close()
@@ -69,6 +69,7 @@ def io_server(brute, sock, auth_token):
     mode, command = readline(sock).split(' ', 1)
     if mode == 'pty':
         stdin, cstdin = pty.openpty()
+        tty.tcsetattr(cstdin, tty.TCSAFLUSH, tty_conf)
         stdout = stderr = stdin
         cstdout = cstderr = cstdin
         tld_devtty.value = '/proc/self/fd/%d'%cstdin
@@ -116,7 +117,8 @@ def io_server(brute, sock, auth_token):
     os.close(efd_w)
 
 def io_server_main(brute, sock, auth_token):
-    while True: io_server(brute, sock.accept()[0], auth_token)
+    tty_conf = tty.tcgetattr(0)
+    while True: io_server(brute, sock.accept()[0], auth_token, tty_conf)
 
 def hook_stdio():
     sys.stdin = io.TextIOWrapper(TLDProxy(sys.stdin.buffer), line_buffering=True)
