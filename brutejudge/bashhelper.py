@@ -120,6 +120,19 @@ def io_server_main(brute, sock, auth_token):
     tty_conf = tty.tcgetattr(0)
     while True: io_server(brute, sock.accept()[0], auth_token, tty_conf)
 
+class MonkeyPopen(subprocess.Popen):
+    def __init__(self, *args, **kwds):
+        args = list(args)
+        if len(args) or 'args' in kwds:
+            for i, (k, d) in enumerate((('args', None), ('bufsize', -1), ('executable', None), ('stdin', None), ('stdout', None), ('stderr', None))):
+                if len(args) <= i:
+                    args.append(kwds.pop(k, d))
+            if args[3] == None: args[3] = sys.stdin
+            if args[4] == None: args[4] = sys.stdout
+            if args[5] == None: args[5] = sys.stderr
+            if args[5] == subprocess.STDOUT: args[5] = sys.stdout
+        super().__init__(*args, **kwds)
+
 def hook_stdio():
     sys.stdin = io.TextIOWrapper(TLDProxy(sys.stdin.buffer), line_buffering=True)
     sys.stdout = io.TextIOWrapper(TLDProxy(sys.stdout.buffer), line_buffering=True)
@@ -131,6 +144,7 @@ def hook_stdio():
             file = tld_devtty.value
         return os_open(file, *args, **kwds)
     os.open = gp_open
+    subprocess.Popen = MonkeyPopen
 
 def start_io_server(brute, auth_token):
     import socket
