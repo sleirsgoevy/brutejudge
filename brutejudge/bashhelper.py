@@ -213,7 +213,7 @@ def main():
         hook_stdio()
         import brutejudge.cmd
         brute = brutejudge.cmd.BruteCMD()
-        auth_token = os.urandom(64).hex()
+        auth_token = '%0128x'%int.from_bytes(os.urandom(64), 'big')
         start_io_server(brute, auth_token)
     else:
         io_client(int(sys.argv[1]), sys.argv[2], ' '.join(map(smart_quote, sys.argv[3:])))
