@@ -15,7 +15,8 @@ def b64decode(s):
 class GCJ(Backend):
     @staticmethod
     def detect(url):
-        return url.startswith('https://codingcompetitions.withgoogle.com/codejam/round/')
+        url = url.split('/')
+        return url[:3] == ['https:', '', 'codingcompetitions.withgoogle.com'] and url[4] == 'round'
     def __init__(self, url, login, password):
         Backend.__init__(self)
         self.round = url.split('/')[5]

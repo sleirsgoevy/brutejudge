@@ -9,10 +9,10 @@ import random
 
 def do_score100(self, cmd):
     """
-    usage: score100 <task> <test_cnt> || score100 <subm_id> || score100 <start-end>
+    usage: score100 <task> <test_cnt> || score100 <subm_id> || score100 <task> <start-end>
 
     Submit a solution that will get a score of 100.
-    If `task` and `test_cnt` are supplied, the solution for task `task` will pass `test_cnt` tests.
+    If `task` and `test_cnt` are supplied, will submit a solution for task `task` that will pass `test_cnt` tests.
     If `subm_id` is supplied, `task` and `test_cnt` will be taken from that.
     If `start` and `end` are supplied, the task is assumed to have from `start` to `end` tests, the exact number will be retrieved using binary search.
     """
