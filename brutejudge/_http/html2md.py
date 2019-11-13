@@ -8,10 +8,13 @@ def validate_tag(data):
     if data.startswith('/'): data = data[1:]
     i = 0
     while i < len(data):
-        j = max(data.find("'", i) % (len(data) + 1), data.find('"', i) % (len(data) + 1))
-        if not set(data[i:j]).issubset(set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ- =')): return False
+        j = min(data.find("'", i) % (len(data) + 1), data.find('"', i) % (len(data) + 1))
+        if not set(data[i:j]).issubset(set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- =')): return False
         if j == len(data): return True
-        i = data.find(data[j], j + 1) % (len(data) + 2) + 1
+        i = j + 1
+        j = data.find(data[j], j + 1) % (len(data) + 1)
+        if j == len(data): return False
+        i = j + 1
     return i == len(data)
 
 def html2md(data, dload_prefix=None, base=None):
@@ -47,7 +50,7 @@ def html2md(data, dload_prefix=None, base=None):
             if i.startswith('/pre>'):
                 ans += '\n```'
                 is_code = False
-            elif i.startswith('pre>'):
+            elif i.startswith('pre>') or i.startswith('pre '):
                 ans += '```\n'
                 is_code = True
             if '>' not in i or not validate_tag(i.split('>', 1)[0]):

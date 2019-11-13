@@ -3,6 +3,7 @@ from .oauth import do_oauth
 from ..base import Backend
 from ..ejudge import get, post
 from ...error import BruteError
+from ..html2md import html2md
 
 def b64encode(s):
     return base64.b64encode(s).replace(b'=', b'').replace(b'/', b'_').replace(b'+', b'-')
@@ -151,6 +152,10 @@ class GCJ(Backend):
                 ans['tests']['success' if i['verdict__str'] == 'CORRECT' else 'fail'] += 1
                 ans['tests']['total'] += 1
         return (ans, None)
+    def problem_info(self, task):
+        for i in self._get_which('dashboard')['challenge']['tasks']:
+            if int(i['id'], 16) == task:
+                return ({}, html2md(i['statement']))
     def submission_score(self, subm_id):
         return self.submission_stats(subm_id)[0].get('score', None)
     def stop_caching(self):

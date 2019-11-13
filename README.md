@@ -42,7 +42,7 @@ do_action          inherit missing stub        stub        missing    stub    st
 download_file      inherit missing stub        stub        stub       missing stub    OK     
 get_samples        OK      OK      stub        stub        OK         missing missing OK     
 login_type         inherit OK      inherit     inherit     inherit    inherit inherit inherit
-problem_info       inherit missing OK          OK          OK         missing OK      OK     
+problem_info       inherit missing OK          OK          OK         OK      OK      OK     
 read_clar          inherit missing stub        stub        stub       missing OK      OK     
 scoreboard         inherit OK      stub        stub        missing    missing missing OK     
 scores             OK      missing OK          OK          OK         OK      OK      OK     
