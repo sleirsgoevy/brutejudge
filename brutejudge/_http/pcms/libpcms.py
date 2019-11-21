@@ -158,7 +158,12 @@ class PCMS:
         req = self.opener.open(self.base_url+'/sources.xhtml?problem=%s&attempt=%d'%(task, attempt))
         if req.geturl().endswith('/runs.xhtml'):
             return None
-        try: return html.unescape(req.read().split(b'<pre dir="ltr" ', 1)[1].split(b'>', 1)[1].split(b'</pre>', 1)[0].decode('latin-1')).encode('latin-1')
+        req = req.read()
+        try: url = urllib.request.urljoin(self.base_url+'/sources.xhtml', html.unescape((b'downloadFile?token='+req.split(b'<a href="downloadFile?token=', 1)[1].split(b'"', 1)[0]).decode('utf-8', 'replace')))
+        except IndexError: pass
+        else:
+            return self.opener.open(url).read()
+        try: return html.unescape(req.split(b'<pre dir="ltr" ', 1)[1].split(b'>', 1)[1].split(b'</pre>', 1)[0].decode('latin-1')).encode('latin-1')
         except IndexError: return None
     def get_links(self):
         req = self.opener.open(self.base_url+'/links.xhtml')
