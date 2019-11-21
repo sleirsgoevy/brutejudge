@@ -180,3 +180,26 @@ class PCMS:
 #(['A', 'B', 'C', 'D'], [(None, {'time': '275:33', 'text': 'C. Прогулка по Бруклину', 'text pre': 'Север сверху?', 'type': 'Yes', 'answer pre': ''}), (None, {'time': '271:02', 'text': 'A. Дела по дому', 'text pre': 'blablabla\nblablabla', 'type': 'No comments', 'answer pre': ''}), (None, {'time': '270:14', 'text': 'A. Дела по дому', 'text pre': 'blablabla\r\nblablabla', 'type': 'No comments', 'answer pre': ''})], '3763962949909805199:-2195426587356402460'
     def submit_clar(self, task, subject, text, vs):
         assert self.opener.open(self.base_url+'/questions.xhtml', urllib.parse.urlencode({'questionForm': 'questionForm', 'questionForm:problem': task, 'questionForm:question': (subject+'\n'+text).strip(), 'questionForm:askQuestion': 'Ask question', 'javax.faces.ViewState': vs}).encode('ascii')).geturl() == self.base_url+'/questions.xhtml'
+    def monitor(self):
+        data = self.opener.open(self.base_url + '/monitor.xhtml').read().decode('utf-8')
+        probs = [i.split('"', 2)[-1].split('>', 1)[-1].split('<', 1)[0] for i in data.split('<th class="problem" ')[1:]]
+        scb = []
+        for i in data.split('<tr class="row')[1:]:
+            i = i.split('>', 1)[1].split('</tr>', 1)[0]
+            info = {}
+            problems = []
+            for j in i.split('<td class="')[1:]:
+                cls, j = j.split('"', 1)
+                j = j.split('>', 1)[1].split('</td>', 1)[0]
+                if cls.startswith('problem '):
+                    flags = cls[8:].split()
+                    print(repr(j))
+                    score, *penalty = j.split('</div>', 1)[0].split('<div>', 1)
+                    print((score, penalty))
+                    if not penalty: penalty = None
+                    else: penalty, = penalty
+                    problems.append((flags, score.strip() or None, penalty.strip() if penalty else None))
+                else:
+                    info[cls] = j
+            scb.append((info, problems))
+        return (probs, scb)

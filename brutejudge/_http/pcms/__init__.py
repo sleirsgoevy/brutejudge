@@ -19,8 +19,8 @@ class PCMS(Backend):
         self._user_clars = []
         self._user_clars_set = set()
         self.pcms.set_locale('English')
-        self.submission_list()
         self._call_cache = {}
+        self.submission_list()
     @staticmethod
     def _remove_tags(t):
         t = t.split('<')
@@ -193,5 +193,25 @@ class PCMS(Backend):
             return self._clars[-1-id][1]['answer pre']
         else:
             return self._messages[-1-id]
+    def scoreboard(self):
+        ans = []
+        for i in self._cache_call(self.pcms.monitor)[1]:
+            ans.append(({'name': i[0]['party']}, []))
+            for j in i[1]:
+                q = {}
+                if j[1] and j[1][0] in ('+', '-'):
+                    try: q['attempts'] = int(j[1][0]+'0'+j[1][1:])
+                    except (TypeError, ValueError): pass
+                else:
+                    try: q['score'] = int(j[1])
+                    except (TypeError, ValueError): pass
+                if j[2]:
+                    try:
+                        a, b = j[2].split(':')
+                        q['penalty'] = 60 * int(a) + int(b)
+                    except (TypeError, ValueError): pass
+                q['flags'] = list(j[0])
+                ans[-1][1].append(q)
+        return ans
     def stop_caching(self):
         self._call_cache.clear()

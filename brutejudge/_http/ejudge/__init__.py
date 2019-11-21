@@ -385,13 +385,14 @@ class Ejudge(Backend):
         teams = [html.unescape(x.split("</td>")[0]) for x in teams]
         probs = data.decode('utf-8').split('<td  class="st_prob')[1:]
         probs = [x.split("</td>")[0] for x in probs]
-        ntasks = len(probs) // len(teams)
+        try: ntasks = len(probs) // len(teams)
+        except ZeroDivisionError: return []
         del teams[-3:]
         del probs[-3*ntasks:]
         probs = iter(probs)
         ans = []
         for i in teams:
-            ans.append((i, []))
+            ans.append(({'name': i}, []))
             for j in range(ntasks):
                 j = next(probs).split('>', 1)[1]
                 if j == '&nbsp;': ans[-1][1].append(None)

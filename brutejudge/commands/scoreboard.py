@@ -25,7 +25,8 @@ def do_scoreboard(self, cmd):
     scb = scoreboard(self.url, self.cookie)
     table = [['']+tasks]
     for u, i in scb:
-        table.append([u]+['' if j == None else format_single(j) for j in i])
-    clens = [max(len(j[i]) for j in table) for i in range(len(tasks)+1)]
-    fmt_s = ' '.join('%%%ds'%i for i in clens)
-    for i in table: print(fmt_s % tuple(i))
+        table.append([u.get('name', '')]+['' if j == None else format_single(j) for j in i])
+    if table:
+        clens = [max(len(j[i]) for j in table) for i in range(len(tasks)+1)]
+        fmt_s = ' '.join('%%%ds'%i for i in clens)
+        for i in table: print(fmt_s % tuple(i))
