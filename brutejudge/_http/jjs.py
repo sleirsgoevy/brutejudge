@@ -173,7 +173,7 @@ class JJS(Backend):
         while str(i) in standings['parties']:
             cur = standings['parties'][str(i)]
             i += 1
-            ans.append(({'name': 'STUB'}, []))
+            ans.append(({'name': 'STUB', 'color': cur['stats']['color'], 'total_score': cur['stats']['score']}, []))
             j = 1
             while str(j) in cur['problems']:
                 cur2 = cur['problems'][str(j)]
