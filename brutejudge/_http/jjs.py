@@ -66,6 +66,7 @@ class JJS(Backend):
             self.cookie = data['data']['authSimple']['data']
         self.url = url
         self.contest = contest_id
+        self.lsu_cache = {}
     def task_list(self):
         code, headers, data = gql_req(self.url, 'query{contests{id,problems{id}}}', None, {"X-Jjs-Auth": self.cookie})
 #       print(data)
@@ -106,12 +107,23 @@ class JJS(Backend):
             raise BruteError("Failed to fetch language list")
     def _submission_descr(self, id):
         id = int(id)
-        code, headers, data = gql_req(self.url, 'query{runs{id,status{code},score}}', None, {"X-Jjs-Auth": self.cookie})
+        code, headers, data = gql_req(self.url, 'query{runs{id,status{code},score,liveStatusUpdate{liveScore,currentTest,finish}}}', None, {"X-Jjs-Auth": self.cookie})
         if gql_ok(data):
             for i in data['data']['runs']:
                 if i['id'] == id:
+#                   print(i)
                     return i
         return None
+    def _get_lsu(self, id, lsu):
+        id = int(id)
+        if lsu['finish']:
+            try: del self.lsu_cache[id]
+            except KeyError: pass
+            return None
+        if id not in self.lsu_cache: self.lsu_cache[id] = {'test': None, 'score': None}
+        if lsu['currentTest'] != None: self.lsu_cache[id]['test'] = lsu['currentTest']
+        if lsu['liveScore'] != None: self.lsu_cache[id]['score'] = lsu['liveScore']
+        return self.lsu_cache[id]
     def _format_status(self, st):
         st = st.replace('_', ' ')
         if st == 'ACCEPTED' or st == 'TEST PASSED': return 'OK'
@@ -132,6 +144,11 @@ class JJS(Backend):
     def submission_status(self, id):
         st = self._submission_descr(id)
         if st == None: return None
+        lsu = self._get_lsu(id, st['liveStatusUpdate'])
+        if lsu != None:
+            status = 'Running'
+            if lsu['test'] != None: status += ', test '+str(lsu['test'])
+            return status
         return self._format_status(st['status']['code'])
 #       if isinstance(st, str): return st
 #       elif isinstance(st, dict) and 'Done' in st:
@@ -143,13 +160,23 @@ class JJS(Backend):
         ans = base64.b64decode(data['data']['runs'][0]['source'].encode('ascii'))
         return ans
     def submission_stats(self, id):
-        return ({'score': self.submission_score(id)}, None)
+        st = self._submission_descr(id)
+        if st == None: return None
+        lsu = self._get_lsu(id, st['liveStatusUpdate'])
+        if lsu != None:
+            ans = {'score': lsu['score']}
+            if lsu['test'] != None: ans['tests'] = {'success': lsu['test']}
+            return (ans, None)
+        return ({'score': st['score']}, None)
     def submission_score(self, id):
         st = self._submission_descr(id)
+        if st == None: return None
+        lsu = self._get_lsu(id)
+        if lsu != None: return lsu['score']
 #       if isinstance(st, dict) and 'Done' in st:
 #           return st['Done'].get('score', None)
 #       else: return None
-        return st['score'] if st != None else None
+        return st['score']
     def get_samples(self, id, *, binary=False):
         def deb64(x):
             ans = base64.b64decode(x.encode('ascii'))
