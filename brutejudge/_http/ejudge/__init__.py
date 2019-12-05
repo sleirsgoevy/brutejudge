@@ -3,6 +3,9 @@ import brutejudge._http.ejudge.ej371, brutejudge._http.ejudge.ej373, brutejudge.
 from brutejudge._http.base import Backend
 from brutejudge.error import BruteError
 
+def _http_header_capitalize(h):
+    return '-'.join(i[:1].upper()+i[1:].lower() for i in h.split('-'))
+
 def do_http(url, method, headers, data=b''):
     if '://' not in url:
         raise BruteError("Invalid URL")
@@ -42,7 +45,7 @@ def do_http(url, method, headers, data=b''):
         l = readline().decode('utf-8').strip()
         if l == '': break
         k, v = l.split(': ', 1)
-        resp_headers.append((k, v))
+        resp_headers.append((_http_header_capitalize(k), v))
     rhd = dict(resp_headers)
     if 'Content-Length' in rhd:
         data = b''
