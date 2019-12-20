@@ -13,7 +13,7 @@ def check_method_status(cls, m_s):
     except OSError: pass
     else:
         src = src.split(':', 1)[1].strip()
-        if src.startswith('raise') and not (src[5].isalnum() or src[5] == '_'):
+        if src.startswith('raise') and not (src[5].isalnum() or src[5] == '_') or '#STUB' in src:
             return 'stub'
     if m_s not in cls.__dict__: return 'inherit'
     return 'OK'

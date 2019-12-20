@@ -163,3 +163,4 @@ class GCJ(Backend):
         return self.submission_stats(subm_id)[0].get('score', None)
     def stop_caching(self):
         self._get_cache.clear()
+    def clars(self): return [] #STUB

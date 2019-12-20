@@ -16,7 +16,6 @@ HTTP_RESPONSE = b'''\
 
 class LoginCodeReceiver(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        print(self.path)
         code = unquote(self.path.split('?code=', 1)[1].split('&', 1)[0])
         self.server.login_code = code
         threading.Thread(target=self.server.shutdown).start()
