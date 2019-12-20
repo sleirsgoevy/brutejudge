@@ -209,3 +209,4 @@ class JJS(Backend):
                 else:
                     ans[-1][1].append({'score': cur2['score'], 'attempts': cur2['attempts'] * (1 if cur2['ok'] else -1)})
         return ans
+    def clars(self): return []
