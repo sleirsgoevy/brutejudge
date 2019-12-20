@@ -171,7 +171,7 @@ class JJS(Backend):
     def submission_score(self, id):
         st = self._submission_descr(id)
         if st == None: return None
-        lsu = self._get_lsu(id)
+        lsu = self._get_lsu(id, st['liveStatusUpdate'])
         if lsu != None: return lsu['score']
 #       if isinstance(st, dict) and 'Done' in st:
 #           return st['Done'].get('score', None)
