@@ -18,13 +18,16 @@ class GCJ(Backend):
     def detect(url):
         url = url.split('/')
         return url[:3] == ['https:', '', 'codingcompetitions.withgoogle.com'] and url[4] == 'round'
-    def __init__(self, url, login, password):
+    @staticmethod
+    def login_type(url):
+        return ['goauth:email profile openid https://www.googleapis.com/auth/codejam']
+    def __init__(self, url, login, password, token=None):
         Backend.__init__(self)
         self.round = url.split('#', 1)[0].split('/')[5]
         if not set(self.round).issubset('0123456789abcdef'):
             raise BruteError("Invalid GCJ URL supplied")
-        self.token = do_oauth(url, login, password)
-        self.email = login
+        self.token = token if token != None else do_oauth(url, login, password)
+#       self.email = login #not used
         self._get_cache = {}
         code, headers, data = self._json_req('https://codejam.googleapis.com/dashboard/%s/poll'%self.round, {})
         if code != 200:

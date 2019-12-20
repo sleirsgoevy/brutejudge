@@ -4,12 +4,12 @@ from brutejudge.error import BruteError
 
 backend_path = [brutejudge._http.ejudge.ejfuse.EJFuse, brutejudge._http.jjs.JJS, brutejudge._http.informatics.Informatics, brutejudge._http.informatics_new.Informatics, brutejudge._http.codeforces.CodeForces, brutejudge._http.gcj.GCJ, brutejudge._http.pcms.PCMS, brutejudge._http.ejudge.Ejudge]
 
-def login(url, login, password):
+def login(url, login, password, **kwds):
     for i in backend_path:
         try: f = i.detect(url)
         except Exception: f = False
         if f:
-            return (i(url, login, password), True)
+            return (i(url, login, password, **kwds), True)
     raise BruteError("Unknown CMS")
 
 def login_type(url):

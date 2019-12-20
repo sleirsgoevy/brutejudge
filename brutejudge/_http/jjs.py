@@ -82,7 +82,7 @@ class JJS(Backend):
     def submission_results(self, id):
         code, headers, data = gql_req(self.url, 'query($a:Int!){runs(id:$a){invocationProtocol(filter:{compileLog:false,testData:false,output:false,answer:false})}}', {"a": int(id)}, {"X-Jjs-Auth": self.cookie})
 #       print(code, headers, data)
-        if not gql_ok(data) or len(data['data']['runs']) != 1:
+        if not gql_ok(data) or len(data['data']['runs']) != 1 or data['data']['runs'][0]['invocationProtocol'] == None:
 #           raise BruteError("Failed to fetch testing protocol")
             return [], []
         prot = json.loads(data['data']['runs'][0]['invocationProtocol'])
