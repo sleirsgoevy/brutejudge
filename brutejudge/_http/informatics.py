@@ -10,6 +10,9 @@ class Informatics(Ejudge):
     def detect(url):
         if not url.endswith('#oldapi'): return False
         url = url[:-7]
+        sp = url.split('/', 3)
+        sp[2] = '.'.join(sp[2].split('.')[-3:])
+        url = '/'.join(sp)
         for proto in ('http', 'https'):
             for domain in ('mccme', 'msk'):
                 if (url+'/').startswith('%s://informatics.%s.ru/'%(proto, domain)):
@@ -23,6 +26,9 @@ class Informatics(Ejudge):
         if not url.endswith('#oldapi'):
             raise BruteError("Not an informatics.msk.ru v1 URL")
         url = url[:-7]
+        sp = url.split('/', 3)
+        sp[2] = '.'.join(sp[2].split('.')[-3:])
+        url = '/'.join(sp)
         Backend.__init__(self)
         for proto in ('http', 'https'):
             for domain in ('mccme', 'msk'):

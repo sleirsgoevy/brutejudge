@@ -10,6 +10,9 @@ SUBM_LIST_URL = "/py/problem/0/filter-runs?problem_id=0&from_timestamp=-1&to_tim
 class Informatics(Ejudge):
     @staticmethod
     def detect(url):
+        sp = url.split('/', 3)
+        sp[2] = '.'.join(sp[2].split('.')[-3:])
+        url = '/'.join(sp)
         for proto in ('http', 'https'):
             for domain in ('mccme', 'msk'):
                 if (url+'/').startswith('%s://informatics.%s.ru/'%(proto, domain)):
@@ -21,6 +24,9 @@ class Informatics(Ejudge):
         return False
     def __init__(self, url, login, password):
         Backend.__init__(self)
+        sp = url.split('/', 3)
+        sp[2] = '.'.join(sp[2].split('.')[-3:])
+        url = '/'.join(sp)
         for proto in ('http', 'https'):
             for domain in ('mccme', 'msk'):
                 if (url+'/').startswith('%s://informatics.%s.ru/'%(proto, domain)):
