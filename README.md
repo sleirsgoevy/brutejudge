@@ -38,7 +38,7 @@ clars              inherit OK      stub        stub        stub       stub    OK
 compile_error      OK      OK      OK          OK          OK         OK      OK      OK     
 compiler_list      OK      OK      OK          OK          OK         OK      OK      OK     
 detect             OK      OK      OK          OK          OK         OK      OK      OK     
-do_action          inherit missing stub        stub        missing    stub    stub    OK     
+do_action          inherit missing stub        OK          missing    stub    stub    OK     
 download_file      inherit missing stub        stub        stub       missing stub    OK     
 get_samples        OK      OK      stub        stub        OK         missing missing OK     
 login_type         inherit OK      inherit     inherit     inherit    OK      inherit inherit

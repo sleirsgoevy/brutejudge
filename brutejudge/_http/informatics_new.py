@@ -46,6 +46,7 @@ class Informatics(Ejudge):
             break
         else:
             raise BruteError("Not an informatics.msk.ru URL")
+        self.url = url
         self.opener = OpenerWrapper(urllib.request.build_opener(urllib.request.HTTPCookieProcessor))
         self.opener.open("https://informatics.msk.ru/")
         req = self.opener.open("https://informatics.msk.ru/login/index.php", urllib.parse.urlencode({
@@ -55,9 +56,17 @@ class Informatics(Ejudge):
         }).encode('ascii'))
         if req.geturl() != 'https://informatics.msk.ru/':
             raise BruteError("Login failed.")
+        self.registered = False
         data = self.opener.open(url).read().decode('utf-8', 'replace')
-        self.user_id = int(data.split('<div id="user_id" style="display: none">', 1)[1].split('</div>', 1)[0])
         query = dict(tuple(i.split('=', 1)) for i in url.split('#', 1)[0].split('?', 1)[1].split('&'))
+        if 'id' in query and '<form action="view3.php?id='+query['id']+'&register=1" method="post">' in data:
+            return
+        self._init_full(data)
+    def _init_full(self, data=None):
+        if data == None:
+            data = self.opener.open(url).read().decode('utf-8', 'replace')
+        self.user_id = int(data.split('<div id="user_id" style="display: none">', 1)[1].split('</div>', 1)[0])
+        query = dict(tuple(i.split('=', 1)) for i in self.url.split('#', 1)[0].split('?', 1)[1].split('&'))
         if 'id' in query:
             tasks = []
             cur_task = int(data.split('<div id="problem_id" style="display: none">', 1)[1].split('</div>', 1)[0])
@@ -75,6 +84,7 @@ class Informatics(Ejudge):
         self.subm_list_partial = []
         self.subm_set = {}
         self._cache = {}
+        self.registered = True
         self.submission_list()
     def _cache_get(self, url):
         with self.cache_lock:
@@ -86,8 +96,10 @@ class Informatics(Ejudge):
     def _request_json(self, url):
         return json.loads(self._cache_get(url).decode('utf-8', 'replace'))
     def task_list(self):
+        if not self.registered: return []
         return list(map(str, self.tasks))
     def submission_list(self):
+        if not self.registered: return [], []
         subms = []
         subms_partial = []
         page_cnt = self._request_json(SUBM_LIST_URL%(self.user_id, 100, 1))['metadata']['page_count']
@@ -132,8 +144,10 @@ class Informatics(Ejudge):
             ans2.append('%.3f'%(data[str(k)]['time']/1000))
         return ans1, ans2
     def task_ids(self):
+        if not self.registered: return []
         return list(self.tasks)
     def submit(self, task, lang, text):
+        if not self.registered: return
         if isinstance(text, str): text = text.encode('utf-8')
         try: task = self.task_ids()[task]#task += 1
         except IndexError: return
@@ -152,6 +166,7 @@ class Informatics(Ejudge):
         data = b'\r\n'.join(b'--'+x+b'\r\nContent-Disposition: form-data; name='+i for i in data)+b'\r\n--'+x+b'--\r\n'
         self.opener.open(urllib.request.Request("https://informatics.msk.ru/py/problem/%d/submit"%task, data, {'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii')}))
     def status(self):
+        if not self.registered: return {}
         self.submission_list()
         by_task = {}
         for a, b in self.subm_list_partial:
@@ -160,6 +175,7 @@ class Informatics(Ejudge):
                 by_task[b] = c
         return collections.OrderedDict((i, by_task.get(i, (None,))[0]) for i in self.task_list())
     def scores(self):
+        if not self.registered: return {}
         self.submission_list()
         by_task = {}
         for a, b in self.subm_list_partial:
@@ -193,14 +209,23 @@ class Informatics(Ejudge):
     def submission_source(self, id):
         data = self._request_json("/py/problem/run/%d/source"%int(id))
         return data.get('data', {}).get('source', None).encode('utf-8')
-    def do_action(self, *args):
+    def do_action(self, action, *args):
+        if action == 'start_virtual':
+            if self.registered: return False
+            data = self.opener.open(self.url).read().decode('utf-8', 'replace')
+            query = dict(tuple(i.split('=', 1)) for i in self.url.split('#', 1)[0].split('?', 1)[1].split('&'))
+            if 'id' not in query or '<form action="view3.php?id='+query['id']+'&register=1" method="post">' not in data:
+                return False
+            data = self.opener.open('https://informatics.msk.ru/mod/statements/view3.php?id='+query['id']+'&register=1', b'').read().decode('utf-8', 'replace')
+            if '<script type="text/javascript">\n//<![CDATA[\n\n  function redirect() {\n      document.location.replace(\'view3.php?id='+query['id']+'\');\n  }\n  setTimeout("redirect()", 3000);\n//]]>\n</script>' not in data: return False
+            self._init_full()
         raise BruteError("NYI")
     def compiler_list(self, prob_id):
         known_compilers = {1: 'fpc', 2: 'gcc', 3: 'g++', 22: 'php', 23: 'python', 24: 'perl', 25: 'mcs', 26: 'ruby', 27: 'python3'}
         data = self._cache_get("/mod/statements/view3.php?chapterid=%d"%prob_id).decode('utf-8', 'replace')
         ans = []
-        for i in data.split('<select name="lang_id" id="lang_id" ', 1)[1].split('>', 1)[1].split('</select>', 1)[0].split("<option value='")[1:]:
-            a = int(i.split("'", 1)[0])
+        for i in data.split('<select name="lang_id" id="lang_id" ', 1)[1].split('>', 1)[1].split('</select>', 1)[0].replace('<option value="', "<option value='").split("<option value='")[1:]:
+            a = int(i.split("'", 1)[0].split('"', 1)[0])
             c = html.unescape(i.split('</option>', 1)[0].split('>', 1)[1])
             b = known_compilers.get(a, str(a))
             ans.append((a, b, c.strip()))
@@ -223,8 +248,13 @@ class Informatics(Ejudge):
     def problem_info(self, id):
         url = "/mod/statements/view3.php?chapterid=%d"%id
         data = self._cache_get(url).decode('utf-8', 'replace')
-        if '<div class="legend">' not in data: return ({}, None)
-        return ({}, html2md.html2md(data.split('<div class="legend">', 1)[1].split("<div id='submit' ", 1)[0], None, "https://informatics.msk.ru"+url))
+        if '<div class="legend">' in data: the_html = data.split('<div class="legend">', 1)[1]
+        elif '<div class="statements_content">' in data:
+            the_html = data.split('<div class="statements_content">', 1)[1]
+            the_html = the_html.split('<h1>', 2)
+            the_html = '<h1>'+the_html[0]+the_html[2]
+        else: return ({}, None)
+        return ({}, html2md.html2md(the_html.split("<div id='submit' ", 1)[0], None, "https://informatics.msk.ru"+url))
     def download_file(self, prob_id, filename):
         raise BruteError("File download doesn't exist on informatics.msk.ru")
     def clars(self):

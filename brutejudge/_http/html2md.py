@@ -5,15 +5,19 @@ def do_unescape(s, code=False):
     return html.unescape(' '.join(('_'+s+'_').split()))[1:-1]
 
 def validate_tag(data):
+    data = data.strip()
     if data.startswith('/'): data = data[1:]
+    if data.endswith('/'): data = data[:-1]
     i = 0
     while i < len(data):
         j = min(data.find("'", i) % (len(data) + 1), data.find('"', i) % (len(data) + 1))
-        if not set(data[i:j]).issubset(set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- =')): return False
+        if not set(data[i:j]).issubset(set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- =')):
+            return False
         if j == len(data): return True
         i = j + 1
         j = data.find(data[j], j + 1) % (len(data) + 1)
-        if j == len(data): return False
+        if j == len(data):
+            return False
         i = j + 1
     return i == len(data)
 
@@ -34,16 +38,16 @@ def html2md(data, dload_prefix=None, base=None):
             ans += '\n\n'+'#'*int(d[1:])+' '+do_unescape(i, is_code)
         elif i.startswith('li>'):
             ans += '* ' + do_unescape(i[3:], is_code)
-        elif any(i.startswith(x) for x in ('br/>', '/h1>', '/h2>', '/h3>', '/h4>', '/h5>', '/h6>', '/p>', '/li>', '/div>')):
+        elif any(i.startswith(x) for x in ('br>', 'br/>', '/h1>', '/h2>', '/h3>', '/h4>', '/h5>', '/h6>', '/p>', '/li>', '/div>')):
             ans += '\n\n' + do_unescape(i.split('>', 1)[1], is_code)
         elif i.startswith('/a>'):
             ans += ')' + do_unescape(i[3:], is_code)
-        elif i.startswith('sub>'):
-            ans += '[' + do_unescape(i[4:], is_code)
+        elif i.startswith('sub>') or i.startswith('sub '):
+            ans += '[' + do_unescape(i.split('>', 1)[-1], is_code)
         elif i.startswith('/sub>'):
             ans += ']' + do_unescape(i[5:], is_code)
-        elif i.startswith('sup>'):
-            ans += '**(' + do_unescape(i[4:], is_code)
+        elif i.startswith('sup>') or i.startswith('sup '):
+            ans += '**(' + do_unescape(i.split('>', 1)[-1], is_code)
         elif i.startswith('/sup>'):
             ans += ')' + do_unescape(i[5:], is_code)
         else:
