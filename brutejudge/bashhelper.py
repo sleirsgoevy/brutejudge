@@ -44,21 +44,6 @@ def io_server_thread(sock, stdin, stdout, stderr, efd):
     finally:
         for i in {stdin, stdout, stderr, efd}: os.close(i)
 
-class TLDProxy:
-     def __init__(self, default):
-         object.__setattr__(self, '_default', default)
-         object.__setattr__(self, '_tld', threading.local())
-     @property
-     def _the_tld(self):
-         try: return self._tld.value
-         except AttributeError: return self._default
-     def __getattr__(self, attr):
-         return getattr(self._the_tld, attr)
-     def __setattr__(self, attr, val):
-         setattr(self._the_tld, attr, val)
-     def __delattr__(self, attr):
-         delattr(self._the_tld, attr)
-
 tld_devtty = threading.local()
 
 def io_server(brute, sock, auth_token, tty_conf):
@@ -87,11 +72,14 @@ def io_server(brute, sock, auth_token, tty_conf):
     cstdin_f = do_open(cstdin, 'rb', closefd=False)
     cstdout_f = do_open(cstdout, 'wb', closefd=False)
     cstderr_f = do_open(cstderr, 'wb', closefd=False)
-    sys.stdin.buffer._tld.value = cstdin_f
-    sys.stdout.buffer._tld.value = cstdout_f
-    sys.stderr.buffer._tld.value = cstderr_f
+    from brutejudge.hook_stdio import RedirectSTDIO
+#   sys.stdin.buffer._tld.value = cstdin_f
+#   sys.stdout.buffer._tld.value = cstdout_f
+#   sys.stderr.buffer._tld.value = cstderr_f
     exitstatus = 0
-    try: brute.onecmd(command)
+    try:
+        with RedirectSTDIO(cstdin_f, cstdout_f, cstderr_f):
+            brute.onecmd(command)
     except SystemExit as e:
         if len(e.args) == 1 and isinstance(e.args[0], int):
             exitstatus = e.args[0]
@@ -104,12 +92,12 @@ def io_server(brute, sock, auth_token, tty_conf):
         sys.excepthook(*sys.exc_info())
         exitstatus = 1
     finally:
-        sys.stdin.flush()
-        sys.stdout.flush()
-        sys.stderr.flush()
-        del sys.stdin.buffer._tld.value
-        del sys.stdout.buffer._tld.value
-        del sys.stderr.buffer._tld.value
+#       sys.stdin.flush()
+#       sys.stdout.flush()
+#       sys.stderr.flush()
+#       del sys.stdin.buffer._tld.value
+#       del sys.stdout.buffer._tld.value
+#       del sys.stderr.buffer._tld.value
         try: del tld_devtty.value
         except AttributeError: pass
         for i in {cstdin, cstdout, cstderr}: os.close(i)
@@ -120,23 +108,8 @@ def io_server_main(brute, sock, auth_token):
     tty_conf = tty.tcgetattr(0)
     while True: io_server(brute, sock.accept()[0], auth_token, tty_conf)
 
-class MonkeyPopen(subprocess.Popen):
-    def __init__(self, *args, **kwds):
-        args = list(args)
-        if len(args) or 'args' in kwds:
-            for i, (k, d) in enumerate((('args', None), ('bufsize', -1), ('executable', None), ('stdin', None), ('stdout', None), ('stderr', None))):
-                if len(args) <= i:
-                    args.append(kwds.pop(k, d))
-            if args[3] == None: args[3] = sys.stdin
-            if args[4] == None: args[4] = sys.stdout
-            if args[5] == None: args[5] = sys.stderr
-            if args[5] == subprocess.STDOUT: args[5] = sys.stdout
-        super().__init__(*args, **kwds)
-
 def hook_stdio():
-    sys.stdin = io.TextIOWrapper(TLDProxy(sys.stdin.buffer), line_buffering=True)
-    sys.stdout = io.TextIOWrapper(TLDProxy(sys.stdout.buffer), line_buffering=True)
-    sys.stderr = io.TextIOWrapper(TLDProxy(sys.stderr.buffer), line_buffering=True)
+    import brutejudge.hook_stdio
     import os
     os_open = os.open
     def gp_open(file, *args, **kwds):
@@ -144,7 +117,6 @@ def hook_stdio():
             file = tld_devtty.value
         return os_open(file, *args, **kwds)
     os.open = gp_open
-    subprocess.Popen = MonkeyPopen
 
 def start_io_server(brute, auth_token):
     import socket
