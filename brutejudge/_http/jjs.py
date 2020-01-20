@@ -99,6 +99,9 @@ class JJS(Backend):
         if isinstance(text, str): text = text.encode('utf-8')
         code, headers, data = gql_req(self.url, 'mutation($z:String!,$a:String!,$b:String!,$c:String!){submitSimple(toolchain:$b,runCode:$c,problem:$a,contest:$z){id}}', {'b': lang, 'c': base64.b64encode(text).decode('ascii'), 'a': taskid, 'z': self.contest}, {"X-Jjs-Auth": self.cookie})
 #       print(code, headers, data)
+        if not gql_ok(data):
+            if 'errors' in data and len(data['errors']) == 1 and 'extensions' in data['errors'][0] and 'errorCode' in data['errors'][0]['extensions']:
+                raise BruteError('Submit failed: '+data['errors'][0]['extensions']['errorCode'])
     def compiler_list(self, task):
         code, headers, data = gql_req(self.url, 'query{toolchains{id,name}}', None, {"X-Jjs-Auth": self.cookie})
         if gql_ok(data):
