@@ -13,7 +13,7 @@ class CacheContext:
 
 class LockWrapper:
     def __init__(self):
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
     def __enter__(self):
         self.lock.acquire()
     def __exit__(self, *args):

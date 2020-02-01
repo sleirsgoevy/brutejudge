@@ -47,7 +47,7 @@ read_clar          inherit missing stub        stub        stub       missing OK
 scoreboard         inherit OK      stub        stub        missing    missing OK      OK     
 scores             OK      missing OK          OK          OK         OK      OK      OK     
 status             OK      missing OK          OK          OK         OK      OK      OK     
-stop_caching       inherit inherit OK          OK          OK         OK      OK      OK     
+stop_caching       inherit OK      OK          OK          OK         OK      OK      OK     
 submission_list    OK      OK      OK          OK          OK         OK      OK      OK     
 submission_results OK      OK      OK          OK          OK         OK      OK      OK     
 submission_score   OK      OK      OK          OK          OK         OK      OK      OK     
