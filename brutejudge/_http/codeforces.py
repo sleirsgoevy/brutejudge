@@ -42,7 +42,7 @@ class CodeForces(Backend):
         csrf = self._get_csrf(data)
         data1 = data.split('name="submittedProblemIndex">', 1)[1].split('</select>', 1)[0].split('<option value="')
         tasks = [i.split('"', 1)[0] for i in data1[2:]]
-        data2 = data.split('name="programTypeId"">', 1)[1].split('</select>', 1)[0].split('<option value="')
+        data2 = data.split('name="programTypeId">', 1)[1].split('</select>', 1)[0].split('<option value="')
         langs = [(int(i.split('"', 1)[0]), html.unescape(i.split('>', 1)[1].split('</option>', 1)[0].strip())) for i in data2[1:]]
         short_codes = {43: 'gcc', 42: 'g++11', 50: 'g++14', 54: 'g++', 2: 'msvc2010', 59: 'msvc2017', 9: 'mcs', 7: 'python', 31: 'python3', 40: 'pypy', 41: 'pypy3'}
         langs_ans = []
@@ -84,7 +84,14 @@ class CodeForces(Backend):
         if self.caching: self._subms_cache[idx] = ans
         return ans
     def task_list(self):
-        return self._get_submit()[0]
+        q = self._get_submit()[0]
+        if not q:
+            data = self.opener.open(self.base_url).read().decode('utf-8')
+            ans = []
+            for i in data.split('<a href="'+self.base_url.split('codeforces.com', 1)[1]+'/problem/')[1:]:
+                ans.append(i.split('"', 1)[0])
+            return ans[::2]
+        return q
     def submission_list(self):
         data = self._get_submissions()[0]
         return [i[0] for i in data], [i[1]['status-small'].split('<a href="', 1)[1].split('"', 1)[0].rsplit('/', 1)[1] for i in data]
@@ -142,7 +149,7 @@ class CodeForces(Backend):
         ans = {i: None for i in self.task_list()}
         for i, j in subms:
             task = j['status-small'].split('<a href="', 1)[1].split('"', 1)[0].rsplit('/', 1)[1]
-            status = self._format_total_status(j['status-cell status-small status-verdict-cell'].split('>', 1)[1])
+            status = self._format_total_status(j['status-cell status-small status-verdict-cell'].split('>', 1)[-1])
             if status in ('Accepted', 'Pretests passed'): status = 'OK'
             if ans.get(task, None) == None or status == 'OK': ans[task] = status
         return ans
@@ -158,13 +165,39 @@ class CodeForces(Backend):
             handle = i.split('<a href="/profile/', 1)[1].split('"', 1)[0]
             if handle != self.handle: continue
             ans = {}
-            for j in i.split('<td\r\n'+' '*16+'problemId="')[1:]:
+            for j in i.replace('<td\r\n'+' '*16+'problemId="', '<td\r\n'+' '*16+'>').split('<td\r\n'+' '*16+'>')[1:]:
                 j = j.split('<span class="cell-', 1)[1].split('>', 1)[1].split('</span>', 1)[0]
                 try: j = int(j)
                 except ValueError: j = -1
                 ans[next(tasks)] = j if j >= 0 else None
             return ans
         return {}
+    def scoreboard(self):
+        with self.cache_lock: data = self._st_cache
+        if data == None:
+            data = self.opener.open(self.base_url+'/standings').read().decode('utf-8', 'replace')
+            with self.cache_lock:
+                if self.caching: self._st_cache = data
+        tasks = (i.split('href="/contest/', 1)[1].split('"', 1)[0].rsplit('/', 1)[1] for i in data.split('<th ')[5:])
+        table = []
+        for i in data.split('<tr participantId="')[1:]:
+            i = i.split('</tr>', 1)[0]
+            handle = i.split('<a href="/profile/', 1)[1].split('"', 1)[0]
+            ans = []
+            for j in i.replace('<td\r\n'+' '*16+'problemId="', '<td\r\n'+' '*16+'>').split('<td\r\n'+' '*16+'>')[1:]:
+                if '<span class="cell-time">' in j:
+                    attempts_ = j.split('<span class="cell-time">', 1)[1].split('<', 1)
+                    attempts = 0
+                    for i in attempts_:
+                        attempts = attempts * 60 + int(i)
+                else:
+                    attempts = None
+                j = j.split('<span class="cell-', 1)[1].split('>', 1)[1].split('</span>', 1)[0]
+                try: j = int(j)
+                except ValueError: j = -1
+                ans.append({'score': j if j >= 0 else None, 'attempts': attempts})
+            table.append(({'name': handle}, ans))
+        return table
     def _compile_error(self, subm_id, csrf):
         return json.loads(self.opener.open('https://codeforces.com/data/judgeProtocol',
             urllib.parse.urlencode({
@@ -178,7 +211,7 @@ class CodeForces(Backend):
 #       return self._format_total_status(subm.get('verdict', ''))
         for i, j in self._get_submissions()[0]:
             if i == subm_id:
-                return self._format_total_status(j['status-cell status-small status-verdict-cell'].split('>', 1)[1])
+                return self._format_total_status(j['status-cell status-small status-verdict-cell'].split('>', 1)[-1])
     def submission_source(self, subm_id):
         subm = self._get_submission(subm_id, self._get_submissions()[1])
         if 'source' in subm: return subm['source'].encode('utf-8')

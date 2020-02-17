@@ -44,7 +44,7 @@ get_samples        OK      OK      stub        stub        OK         missing mi
 login_type         inherit OK      inherit     inherit     inherit    OK      inherit inherit
 problem_info       inherit missing OK          OK          OK         OK      OK      OK     
 read_clar          inherit missing stub        stub        stub       missing OK      OK     
-scoreboard         inherit OK      stub        stub        missing    missing OK      OK     
+scoreboard         inherit OK      stub        stub        OK         missing OK      OK     
 scores             OK      missing OK          OK          OK         OK      OK      OK     
 status             OK      missing OK          OK          OK         OK      OK      OK     
 stop_caching       inherit OK      OK          OK          OK         OK      OK      OK     
