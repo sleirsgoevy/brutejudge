@@ -34,7 +34,7 @@ Then type `brutejudge` into the prompt.
 
 ```
                    EJFuse  JJS     Informatics Informatics CodeForces GCJ     PCMS    Ejudge 
-clars              inherit OK      stub        stub        stub       stub    OK      OK     
+clars              inherit missing stub        stub        stub       stub    OK      OK     
 compile_error      OK      OK      OK          OK          OK         OK      OK      OK     
 compiler_list      OK      OK      OK          OK          OK         OK      OK      OK     
 detect             OK      OK      OK          OK          OK         OK      OK      OK     
@@ -45,8 +45,8 @@ login_type         inherit OK      inherit     inherit     inherit    OK      in
 problem_info       inherit missing OK          OK          OK         OK      OK      OK     
 read_clar          inherit missing stub        stub        stub       missing OK      OK     
 scoreboard         inherit OK      stub        stub        OK         missing OK      OK     
-scores             OK      missing OK          OK          OK         OK      OK      OK     
-status             OK      missing OK          OK          OK         OK      OK      OK     
+scores             OK      OK      OK          OK          OK         OK      OK      OK     
+status             OK      OK      OK          OK          OK         OK      OK      OK     
 stop_caching       inherit OK      OK          OK          OK         OK      OK      OK     
 submission_list    OK      OK      OK          OK          OK         OK      OK      OK     
 submission_results OK      OK      OK          OK          OK         OK      OK      OK     

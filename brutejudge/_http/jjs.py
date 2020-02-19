@@ -116,6 +116,15 @@ class JJS(Backend):
         if not gql_ok(data):
             if 'errors' in data and len(data['errors']) == 1 and 'extensions' in data['errors'][0] and 'errorCode' in data['errors'][0]['extensions']:
                 raise BruteError('Submit failed: '+data['errors'][0]['extensions']['errorCode'])
+    def status(self):
+        ans = {}
+        for i, j in zip(self.task_list(), self.scoreboard()[0][1]):
+            if j == None: ans[i] = None
+            elif j['attempts'] < 0: ans[i] = 'Partial solution'
+            else: ans[i] = 'OK'
+        return ans
+    def scores(self):
+        return {i: (j['score'] if j != None else None) for i, j in zip(self.task_list(), self.scoreboard()[0][1])}
     def compiler_list(self, task):
         code, headers, data = self._gql_req('query{toolchains{id,name}}')
         if gql_ok(data):
@@ -229,4 +238,3 @@ class JJS(Backend):
                 else:
                     ans[-1][1].append({'score': cur2['score'], 'attempts': cur2['attempts'] * (1 if cur2['ok'] else -1)})
         return ans
-    def clars(self): return []
