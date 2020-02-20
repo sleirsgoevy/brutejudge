@@ -118,27 +118,39 @@ def hook_stdio():
         return os_open(file, *args, **kwds)
     os.open = gp_open
 
-def start_io_server(brute, auth_token):
+def start_io_server(brute, auth_token, zsh=False):
     import socket
     sock = socket.socket()
     sock.bind(('127.0.0.1', 0))
     sock.listen(1)
-    threading.Thread(target=run_bash, args=(sock.getsockname(), auth_token), daemon=True).start()
+    threading.Thread(target=run_bash, args=(sock.getsockname(), auth_token, zsh), daemon=True).start()
     try: io_server_main(brute, sock, auth_token)
     except:
         if mustexit != None: exit(mustexit)
         raise
 
-def run_bash(arg, auth_token):
+def run_bash(arg, auth_token, zsh=False):
     global mustexit
     port = arg[1]
     env = dict(os.environ)
-    for i in ('BASH_FUNC_%s%%%%', 'BASH_FUNC_%s()', '%s'):
-        env[i%'command_not_found_handle'] = env[i%'bj'] = '() { python3 -m brutejudge.bashhelper %d %s "$@"; }'%(port, auth_token)
-    ppath = os.environ.get('PYTHONPATH', None)
-    ppath = os.path.split(os.path.split(__file__)[0])[0]+(':'+ppath if ppath != None else '')
-    env['PYTHONPATH'] = ppath
-    mustexit = subprocess.call('bash', env=env)
+    func_code = '() { python3 -m brutejudge.bashhelper %d %s "$@"; }'%(port, auth_token)
+    if zsh: # this sucks
+        dotdir = env.get('ZDOTDIR', env['HOME'])
+        import tempfile
+        with tempfile.TemporaryDirectory() as dir:
+            with open(dir+'/.zshrc', 'w') as file:
+                file.write('source '+shlex.quote(dotdir+'/.zshrc')+'\n')
+                file.write('command_not_found_handler '+func_code+'\n\n')
+                file.write('bj '+func_code+'\n')
+            env['ZDOTDIR'] = dir
+            mustexit = subprocess.call('zsh', env=env)
+    else:
+        for i in ('BASH_FUNC_%s%%%%', 'BASH_FUNC_%s()', '%s'):
+            env[i%'command_not_found_handle'] = env[i%'bj'] = func_code
+        ppath = os.environ.get('PYTHONPATH', None)
+        ppath = os.path.split(os.path.split(__file__)[0])[0]+(':'+ppath if ppath != None else '')
+        env['PYTHONPATH'] = ppath
+        mustexit = subprocess.call('bash', env=env)
     os.kill(os.getpid(), signal.SIGINT)
 
 def io_client(port, auth_token, cmd):
@@ -181,12 +193,12 @@ def smart_quote(x):
 def main():
     signal.signal(signal.SIGTTIN, signal.SIG_IGN)
     signal.signal(signal.SIGTTOU, signal.SIG_IGN)
-    if len(sys.argv) == 1 or sys.argv[1] == '--bash':
+    if len(sys.argv) == 1 or sys.argv[1] in ('--bash', '--zsh'):
         hook_stdio()
         import brutejudge.cmd
         brute = brutejudge.cmd.BruteCMD()
         auth_token = '%0128x'%int.from_bytes(os.urandom(64), 'big')
-        start_io_server(brute, auth_token)
+        start_io_server(brute, auth_token, zsh=(len(sys.argv) > 1 and sys.argv[1] == '--zsh'))
     else:
         io_client(int(sys.argv[1]), sys.argv[2], ' '.join(map(smart_quote, sys.argv[3:])))
 

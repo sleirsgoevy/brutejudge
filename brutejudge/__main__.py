@@ -1,6 +1,6 @@
 import sys
 
-if '--bash' in sys.argv:
+if '--bash' in sys.argv or '--zsh' in sys.argv:
     import brutejudge.bashhelper
     brutejudge.bashhelper.main()
     exit(0)
