@@ -23,7 +23,7 @@ def do_http(url, method, headers, data=b''):
     if host.startswith('[') and host.endswith(']'): host = host[1:-1]
     sock = socket.create_connection((host, port))
     if proto == 'https':
-        sock = ssl.wrap_socket(sock)
+        sock = ssl.create_default_context().wrap_socket(sock, server_hostname=host)
     headers['Host'] = s_host
     if data:
         headers['Content-Length'] = len(data)
