@@ -247,7 +247,7 @@ class JJS(Backend):
     def contest_list(self):
         if isinstance(self, str):
             if '?' in self:
-                url, params = self.split('?')[0]
+                url, params = self.split('?')
                 params = {k: v for k, v in (i.split('=', 1) if '=' in i else (i, None) for i in params.split('&'))}
             else:
                 url = self
@@ -257,11 +257,12 @@ class JJS(Backend):
         else:
             url = self.url
             params = dict(self.params)
+        url0 = url
         url = url.replace('+jjs', '', 1)
         code, headers, data = gql_req(url, 'query{contests{id,title}}', {})
         ans = []
         if not gql_ok(data): return ans
         for i in data['data']['contests']:
             params['contest'] = i['id']
-            ans.append((url[:-7]+'?'+urllib.parse.urlencode(params), i['title'], {}))
+            ans.append((url0[:-7]+'?'+urllib.parse.urlencode(params), i['title'], {}))
         return ans
