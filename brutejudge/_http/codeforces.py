@@ -18,10 +18,10 @@ class CodeForces(Backend):
             url = '/contest'.join(url.split('/contests', 1))
         self.base_url = url
         self.handle = login
-        host = url.split('/')[2]
+        self.host = url.split('/')[2]
         self.opener = OpenerWrapper(urllib.request.build_opener(urllib.request.HTTPCookieProcessor))
-        csrf = self._get_csrf(self.opener.open('https://%s/enter?back=%%2F'%host).read().decode('utf-8', 'replace'))
-        ln = self.opener.open('https://%s/enter?back=%%2F'%host, urllib.parse.urlencode({
+        csrf = self._get_csrf(self.opener.open('https://%s/enter?back=%%2F'%self.host).read().decode('utf-8', 'replace'))
+        ln = self.opener.open('https://%s/enter?back=%%2F'%self.host, urllib.parse.urlencode({
             'csrf_token': csrf,
             'action': 'enter',
             'ftaa': '',
@@ -29,7 +29,7 @@ class CodeForces(Backend):
             'handleOrEmail': login,
             'password': password
         }).encode('ascii'))
-        if ln.geturl() != 'https://%s/'%host:
+        if ln.geturl() != 'https://%s/'%self.host:
             raise BruteError("Login failed.")
         self._gs_cache = None
         self._st_cache = None
@@ -173,31 +173,17 @@ class CodeForces(Backend):
             return ans
         return {}
     def scoreboard(self):
-        with self.cache_lock: data = self._st_cache
-        if data == None:
-            data = self.opener.open(self.base_url+'/standings').read().decode('utf-8', 'replace')
-            with self.cache_lock:
-                if self.caching: self._st_cache = data
-        tasks = (i.split('href="/contest/', 1)[1].split('"', 1)[0].rsplit('/', 1)[1] for i in data.split('<th ')[5:])
-        table = []
-        for i in data.split('<tr participantId="')[1:]:
-            i = i.split('</tr>', 1)[0]
-            handle = i.split('<a href="/profile/', 1)[1].split('"', 1)[0]
-            ans = []
-            for j in i.replace('<td\r\n'+' '*16+'problemId="', '<td\r\n'+' '*16+'>').split('<td\r\n'+' '*16+'>')[1:]:
-                if '<span class="cell-time">' in j:
-                    attempts_ = j.split('<span class="cell-time">', 1)[1].split('<', 1)
-                    attempts = 0
-                    for i in attempts_:
-                        attempts = attempts * 60 + int(i)
-                else:
-                    attempts = None
-                j = j.split('<span class="cell-', 1)[1].split('>', 1)[1].split('</span>', 1)[0]
-                try: j = int(j)
-                except ValueError: j = -1
-                ans.append({'score': j if j >= 0 else None, 'attempts': attempts})
-            table.append(({'name': handle}, ans))
-        return table
+        contest_id = self.base_url.split('/')
+        while not contest_id[-1]: contest_id.pop()
+        contest_id = int(contest_id[-1])
+        data = json.loads(self.opener.open('https://'+self.host+'/api/contest.standings?contestId=%d&from=1&count=1000000000'%contest_id).read().decode('utf-8', 'replace'))
+        if data['status'] != 'OK':
+            raise BruteError('Failed to load scoreboard.')
+        return [
+            ({'name': ', '.join(j['handle'] for j in i['party']['members'])}, [
+                ({'score': j['points'], 'attempts': j['bestSubmissionTimeSeconds']} if 'bestSubmissionTimeSeconds' in j else None)
+            for j in i['problemResults']])
+        for i in data['result']['rows']]
     def _compile_error(self, subm_id, csrf):
         return json.loads(self.opener.open('https://codeforces.com/data/judgeProtocol',
             urllib.parse.urlencode({

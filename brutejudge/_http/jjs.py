@@ -68,6 +68,9 @@ class JJS(Backend):
         self.contest = contest_id
         self.lsu_cache = {}
         self._get_cache = {}
+        code, headers, data = self._gql_req('query($a:String!){contest(name:$a){id,problems{id}}}', {"a": self.contest})
+        if not gql_ok(data) or data['data']['contest'] == None:
+            raise BruteError('Login failed: unknown contest')
     def _gql_req(self, query, post_data=None):
         key = (query, tuple(sorted(post_data.items())) if post_data != None else None)
         try: return self._get_cache[key]
@@ -80,11 +83,11 @@ class JJS(Backend):
     def stop_caching(self):
         self._get_cache.clear()
     def task_list(self):
-        code, headers, data = self._gql_req('query{contests{id,problems{id}}}')
+        code, headers, data = self._gql_req('query($a:String!){contest(name:$a){id,problems{id}}}', {"a": self.contest})
 #       print(data)
         if not gql_ok(data):
             raise BruteError("Failed to fetch task list")
-        return [j['id'] for i in data['data']['contests'] if i['id'] == self.contest for j in i['problems']]
+        return [j['id'] for j in data['data']['contest']['problems']]
     def submission_list(self):
         code, headers, data = self._gql_req('query{runs{id,problem{id}}}')
 #       print(data)

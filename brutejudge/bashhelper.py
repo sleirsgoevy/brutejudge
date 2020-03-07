@@ -101,8 +101,10 @@ def io_server(brute, sock, auth_token, tty_conf):
         try: del tld_devtty.value
         except AttributeError: pass
         for i in {cstdin, cstdout, cstderr}: os.close(i)
-    os.write(efd_w, bytes((exitstatus,)))
-    os.close(efd_w)
+    try:
+        os.write(efd_w, bytes((exitstatus,)))
+        os.close(efd_w)
+    except OSError: pass
 
 def io_server_main(brute, sock, auth_token):
     tty_conf = tty.tcgetattr(0)
