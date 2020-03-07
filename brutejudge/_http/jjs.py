@@ -1,4 +1,4 @@
-import json, base64, socket
+import json, base64, socket, urllib.parse
 from brutejudge.error import BruteError
 from brutejudge._http.base import Backend
 from brutejudge._http.ejudge import do_http, get, post
@@ -26,7 +26,9 @@ class JJS(Backend):
     def login_type(url):
         url, params = url.split('?')
         params = {k: v for k, v in (i.split('=', 1) if '=' in i else (i, None) for i in params.split('&'))}
-        if params.get('auth', None) == 'token':
+        if 'contest' not in params:
+            return ['contest_list']
+        elif params.get('auth', None) == 'token':
             return ['pass']
         elif params.get('auth', None) in ('gettoken', 'guest'):
             return []
@@ -65,6 +67,7 @@ class JJS(Backend):
                 raise BruteError('Login failed')
             self.cookie = data['data']['authSimple']['data']
         self.url = url
+        self.params = params
         self.contest = contest_id
         self.lsu_cache = {}
         self._get_cache = {}
@@ -240,4 +243,25 @@ class JJS(Backend):
                 if cur2['empty']: ans[-1][1].append(None)
                 else:
                     ans[-1][1].append({'score': cur2['score'], 'attempts': cur2['attempts'] * (1 if cur2['ok'] else -1)})
+        return ans
+    def contest_list(self):
+        if isinstance(self, str):
+            if '?' in self:
+                url, params = self.split('?')[0]
+                params = {k: v for k, v in (i.split('=', 1) if '=' in i else (i, None) for i in params.split('&'))}
+            else:
+                url = self
+                params = {}
+            if url.endswith('/'): url = url[:-1]
+            url += '/graphql'
+        else:
+            url = self.url
+            params = dict(self.params)
+        url = url.replace('+jjs', '', 1)
+        code, headers, data = gql_req(url, 'query{contests{id,title}}', {})
+        ans = []
+        if not gql_ok(data): return ans
+        for i in data['data']['contests']:
+            params['contest'] = i['id']
+            ans.append((url[:-7]+'?'+urllib.parse.urlencode(params), i['title'], {}))
         return ans

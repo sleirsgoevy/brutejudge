@@ -31,3 +31,5 @@ class Backend:
     @staticmethod
     def login_type(url):
         return ['login', 'pass']
+    def contest_list(self):
+        return []

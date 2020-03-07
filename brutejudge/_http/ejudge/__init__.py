@@ -123,7 +123,7 @@ class Ejudge(Backend):
         base_url = rhd['Location'].split('&')[0]
         if 'new-client?SID=' in base_url:
             urls = ej371.get_urls(base_url)
-        elif '/user/' in base_url or '/client/' in base_url or '/register?SID=' in base_url:
+        elif any(i in base_url for i in ('/user/', '/client/', '/register/', '/register?SID=')):
             urls = ej373.get_urls(base_url)
         else:
             raise BruteError("Unknown ejudge version.")
@@ -415,3 +415,15 @@ class Ejudge(Backend):
         return ans
     def stop_caching(self):
         self._get_cache.clear()
+    def contest_list(self):
+        if isinstance(self, str): url = self
+        else: url = self.urls['contest_list']
+        code, headers, data = get(url)
+        if code != 200:
+            return []
+        ans = []
+        for i in data.decode('utf-8').split('<td><a href="')[1:]:
+            url = html.unescape(i.split('"', 1)[0])
+            name = html.unescape(i.split('>', 1)[1].split('<', 1)[0])
+            ans.append((name, url, {}))
+        return ans

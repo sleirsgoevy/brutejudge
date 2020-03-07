@@ -1,5 +1,5 @@
 import cmd, sys, traceback, os, shlex
-from .http import login, task_list, submission_list, submission_results, submission_status, submit, status, scores, compile_error, submission_source, task_ids, compiler_list, submission_stats, submission_score, has_feature
+from .http import login, task_list, submission_list, submission_results, submission_status, submit, status, scores, compile_error, submission_source, task_ids, compiler_list, submission_stats, submission_score, has_feature, contest_list
 from .error import BruteError
 import brutejudge.commands
 
@@ -30,7 +30,7 @@ class BruteCMD(cmd.Cmd):
         """
         usage: login <login_page_url> <username>
 
-        Login to ejudge.
+        Login to CMS.
         """
         data = cmd.split(' ')
         if len(data) != 2:
@@ -42,11 +42,26 @@ class BruteCMD(cmd.Cmd):
         """
         usage: logout
 
-        Logout from ejudge.
+        Logout from CMS.
         """
         if not isspace(cmd):
             return self.do_help('logout')
         self.url = self.cookie = None
+    def do_lsc(self, cmd):
+        """
+        usage: lsc [url]
+
+        List all contests for the given URL, and their corresponding login URLs.
+        """
+        if isspace(cmd):
+            url, cookie = self.url, self.cookie
+        else:
+            url = cmd
+            cookie = None
+        data = contest_list(url, cookie)
+        print("URL\tTitle")
+        for url, title, _ in data:
+            print(url+'\t'+title)
     def do_tasks(self, cmd):
         """
         usage: tasks

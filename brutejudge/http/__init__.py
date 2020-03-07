@@ -33,3 +33,14 @@ def has_feature(url, cookie, methodname, argname):
     if not hasattr(url, methodname): return False
     m = getattr(url, methodname).__func__.__code__
     return argname in m.co_varnames[:m.co_argcount+m.co_kwonlyargcount]
+
+def contest_list(url, cookie):
+    if cookie == None: # anonymous, url is string with url
+        for i in backend_path:
+            try: f = i.detect(url)
+            except Exception: f = False
+            if f:
+                return i.contest_list(url)
+        return []
+    else: # non-anonymous, url is the backend object
+        return url.contest_list()
