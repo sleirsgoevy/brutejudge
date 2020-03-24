@@ -75,7 +75,7 @@ class CodeForces(Backend):
         return ans
     def _get_submission(self, idx, csrf):
         if idx in self._subms_cache: return self._subms_cache[idx]
-        req = self.opener.open('https://codeforces.com/data/submitSource', urllib.parse.urlencode(
+        req = self.opener.open('https://'+self.host+'/data/submitSource', urllib.parse.urlencode(
         {
             'submissionId': idx,
             'csrf_token': csrf
@@ -88,7 +88,10 @@ class CodeForces(Backend):
         if not q:
             data = self.opener.open(self.base_url).read().decode('utf-8')
             ans = []
-            for i in data.split('<a href="'+self.base_url.split('codeforces.com', 1)[1]+'/problem/')[1:]:
+            sp = data.split('<a href="'+self.base_url.rsplit('codeforces.com', 1)[1]+'/problem/')
+            if sp[0].rfind('<') > sp[0].rfind('>'):
+                return ans
+            for i in sp[1:]:
                 ans.append(i.split('"', 1)[0])
             return ans[::2]
         return q
@@ -106,7 +109,8 @@ class CodeForces(Backend):
         v = v[0]+''.join(i.split('>', 1)[1] for i in v[1:])
         v = v.split(' on test ', 1)[0]
         v = v.split(' on pretest ', 1)[0]
-        return v.strip()
+        v = v.strip()
+        return 'OK' if v == 'Accepted' else v
     def submission_results(self, subm_id):
         data = self._get_submission(subm_id, self._get_submissions()[1])
         ntests = int(data.get('testCount', 0))
@@ -185,7 +189,7 @@ class CodeForces(Backend):
             for j in i['problemResults']])
         for i in data['result']['rows']]
     def _compile_error(self, subm_id, csrf):
-        return json.loads(self.opener.open('https://codeforces.com/data/judgeProtocol',
+        return json.loads(self.opener.open('https://'+self.host+'/data/judgeProtocol',
             urllib.parse.urlencode({
                 'submissionId': subm_id,
                 'csrf_token': csrf

@@ -8,16 +8,24 @@ def read_file(name, options=set(), includes=None):
     includes.add(name)
     with open(name) as file:
         lines = file.read().split('\n')
-    for i in range(len(lines)):
-        l = lines[i]
-        if l.startswith('#include "'):
-            p2 = os.path.join(os.path.split(name)[0], eval(l[9:]))
-            lines[i] = read_file(p2, includes)+'\n'
+    if '-include' not in options:
+        for i in range(len(lines)):
+            l = lines[i]
+            if l.startswith('#include "'):
+                p2 = os.path.join(os.path.split(name)[0], eval(l[9:]))
+                lines[i] = read_file(p2, includes=includes)+'\n'
     ans = '\n'.join(lines)
-    while '\n\n\n' in ans:
-        ans = ans.replace('\n\n\n', '\n\n')
+    ans2 = ''
+    c = 0
+    for i in ans:
+        if i == '\n':
+            c += 1
+            if c >= 3: continue
+        else:
+            c = 0
+        ans2 += i
     includes.remove(name)
-    return ans
+    return ans2
 
 def format(original, options=set(), cplusplus=True):
     i = 0
