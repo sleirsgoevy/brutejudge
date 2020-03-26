@@ -148,7 +148,7 @@ class JJS(Backend):
                 return i
     def _get_lsu(self, id):
         id = int(id)
-        code, headers, lsu = json_req(self.url+'/runs/%d/live', None, {'Authorization': self.cookie})
+        code, headers, lsu = json_req(self.url+'/runs/%d/live'%id, None, {'Authorization': self.cookie})
         if code != 200:
             return self.lsu_cache.get(id, None)
         if lsu['finish']:
