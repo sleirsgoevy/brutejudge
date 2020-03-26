@@ -205,7 +205,9 @@ class Ejudge(Backend):
             else: break
     #   x = '-----------------------------850577185583170701784494929'
         data = b'\r\n'.join(b'--'+x+b'\r\nContent-Disposition: form-data; name='+i for i in data)+b'\r\n--'+x+b'--\r\n'
-        return post(url, data, {'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii'), 'Cookie': self.cookie})
+        ans = post(url, data, {'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii'), 'Cookie': self.cookie})
+        with self.cache_lock: self.stop_caching()
+        return ans
     def status(self):
         code, headers, data = self._cache_get(self.urls['summary'])
         if code != 200:
@@ -349,6 +351,7 @@ class Ejudge(Backend):
     def submit_clar(self, task, subject, text): 
         if post(self.urls['submit'], {'SID': self.urls['sid'], 'prob_id': task, 'subject': subject, 'text': text, 'action_41': 'Send!'}, {'Cookie': self.cookie})[0] != 302:
             raise BruteError("Failed to submit clar")
+        with self.cache_lock: self.stop_caching()
     def read_clar(self, id):
         code, headers, data = self._cache_get(self.urls['read_clar'].format(clar_id=id))
         data = html.unescape(data.decode('utf-8').split('<pre class="message">', 1)[1].split('</pre>', 1)[0])

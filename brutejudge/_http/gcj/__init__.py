@@ -94,6 +94,7 @@ class GCJ(Backend):
             try: task = tasks['challenge']['tasks'][task]['id']
             except IndexError: return
         self._json_req('https://codejam.googleapis.com/dashboard/%s/submit'%self.round, {'code': code, 'language_id': lang, 'task_id': task}, do_post=True)
+        with self.cache_lock: self.stop_caching()
     def status(self):
         user_data = {}
         data = self._get_which('scoreboard', "Failed to fetch scoreboard.", {'num_consecutive_users': 0})

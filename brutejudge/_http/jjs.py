@@ -7,7 +7,6 @@ def urlescape(s):
     return urllib.parse.urlencode({'x': s})[2:]
 
 def json_req(url, data, headers={}, method=None):
-    print(url)
     if data != None:
         data = json.dumps(data).encode('utf-8')
         if method == None: method = 'POST'
@@ -37,7 +36,6 @@ class JJS(Backend):
         else:
             return ['login', 'pass']
     def __init__(self, url, login, password):
-        print(url)
         Backend.__init__(self)
         url, params = url.split('?')
         url = url.replace('+jjs', '', 1)
@@ -121,6 +119,7 @@ class JJS(Backend):
             try: msg = 'Submit failed: '+data['detail']['errorCode']
             except: return
             else: raise BruteError(msg)
+        with self.cache_lock: self.stop_caching()
     def status(self):
         ans = {}
         with self.may_cache():

@@ -84,6 +84,7 @@ class PCMS(Backend):
             text = text.encode('utf-8')
         try: self.pcms.submit(task, lang, text, vs, {i[lang] for i in exts.values() if lang in i}.pop())
         except AssertionError: pass
+        with self.cache_lock: self.stop_caching()
     def status(self):
         x = self._cache_call(self.pcms.get_submissions)
         ans = collections.OrderedDict()
@@ -186,6 +187,7 @@ class PCMS(Backend):
         except IndexError: pass
         try: self.pcms.submit_clar(task, subject, text, vs)
         except AssertionError: raise BruteError("Failed to submit clar")
+        with self.cache_lock: self.stop_caching()
     def read_clar(self, id):
         self._get_clars()
         id, kind = divmod(id, 2)

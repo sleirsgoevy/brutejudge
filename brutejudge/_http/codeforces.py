@@ -148,6 +148,7 @@ class CodeForces(Backend):
     def submit(self, task, lang, text):
         tasks, langs, csrf = self._get_submit()
         self._submit(tasks[task], lang, text, csrf)
+        with self.cache_lock: self.stop_caching()
     def status(self):
         subms = self._get_submissions()[0]
         ans = {i: None for i in self.task_list()}

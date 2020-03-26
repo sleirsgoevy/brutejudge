@@ -165,6 +165,7 @@ class Informatics(Ejudge):
     #   x = '-----------------------------850577185583170701784494929'
         data = b'\r\n'.join(b'--'+x+b'\r\nContent-Disposition: form-data; name='+i for i in data)+b'\r\n--'+x+b'--\r\n'
         self.opener.open(urllib.request.Request("https://informatics.msk.ru/py/problem/%d/submit"%task, data, {'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii')}))
+        with self.cache_lock: self.stop_caching()
     def status(self):
         if not self.registered: return {}
         self.submission_list()
