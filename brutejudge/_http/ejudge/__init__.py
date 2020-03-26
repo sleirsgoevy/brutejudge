@@ -6,7 +6,7 @@ from brutejudge.error import BruteError
 def _http_header_capitalize(h):
     return '-'.join(i[:1].upper()+i[1:].lower() for i in h.split('-'))
 
-def do_http(url, method, headers, data=b''):
+def do_http(url, method, headers={}, data=b''):
     if '://' not in url:
         raise BruteError("Invalid URL")
     proto, path = url.split('://', 1)

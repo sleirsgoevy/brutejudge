@@ -3,19 +3,21 @@ from brutejudge.error import BruteError
 from brutejudge._http.base import Backend
 from brutejudge._http.ejudge import do_http, get, post
 
-def gql_req(url, query, params, headers={}):
-    headers = dict(headers)
-    for k, v in list(headers.items()):
-        if v == None: del headers[k]
-    headers['Content-Type'] = 'application/json'
-    code, headers, data = post(url, json.dumps({"query": query, "variables": params}), headers)
-    try: return (code, headers, json.loads(data.decode('utf-8')))
-    except json.JSONDecodeError:
-#       print(data)
-        return (code, headers, None)
+def urlescape(s):
+    return urllib.parse.urlencode({'x': s})[2:]
 
-def gql_ok(data):
-    return data and 'data' in data and 'errors' not in data
+def json_req(url, data, headers={}, method=None):
+    print(url)
+    if data != None:
+        data = json.dumps(data).encode('utf-8')
+        if method == None: method = 'POST'
+    else:
+        data = b''
+        if method == None: method = 'GET'
+    code, headers, data = do_http(url, method, headers, data)
+    try: data = json.loads(data.decode('utf-8'))
+    except (json.JSONDecodeError, UnicodeDecodeError): data = None
+    return (code, headers, data)
 
 class JJS(Backend):
     @staticmethod
@@ -35,15 +37,15 @@ class JJS(Backend):
         else:
             return ['login', 'pass']
     def __init__(self, url, login, password):
+        print(url)
         Backend.__init__(self)
         url, params = url.split('?')
         url = url.replace('+jjs', '', 1)
         if url.endswith('/'): url = url[:-1]
-        url += '/graphql'
         params = {k: v for k, v in (i.split('=', 1) if '=' in i else (i, None) for i in params.split('&'))}
         contest_id = params['contest']
         if params.get('auth', None) == 'token':
-            self.cookie = password
+            self.cookie = 'Token '+password
         elif params.get('auth', None) == 'gettoken':
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.connect('/tmp/jjs-auth-sock')
@@ -55,58 +57,50 @@ class JJS(Backend):
             token = token.decode('ascii').strip()
             if not (token.startswith('===') and token.endswith('===')):
                 raise BruteError('Login failed: failed to get token from jjs-auth-sock')
-            self.cookie = token[3:-3]
+            self.cookie = 'Token '+token[3:-3]
         elif params.get('auth', None) == 'guest':
-            self.cookie = 'Guest'
+            self.cookie = 'Token Guest'
         else:
-            code, headers, data = gql_req(url, 'mutation($a:String!,$b:String!){authSimple(login:$a,password:$b){data}}', {"a": login, "b": password})
-#           print(url, code, headers, data)
-            if not gql_ok(data):
-                if 'errors' in data and len(data['errors']) == 1 and 'extensions' in data['errors'][0] and 'errorCode' in data['errors'][0]['extensions']:
-                    raise BruteError('Login failed: '+data['errors'][0]['extensions']['errorCode'])
-                raise BruteError('Login failed')
-            self.cookie = data['data']['authSimple']['data']
+            code, headers, data = json_req(url + '/auth/simple', {'login': login, 'password': password})
+            if code != 200:
+                try: msg = 'Login failed: %s'%data['detail']['errorCode']
+                except Exception: msg = 'Login failed.'
+                raise BruteError(msg)
+            self.cookie = 'Token '+data['data']
         self.url = url
         self.params = params
         self.contest = contest_id
         self.lsu_cache = {}
         self._get_cache = {}
-        code, headers, data = self._gql_req('query($a:String!){contest(name:$a){id,problems{id}}}', {"a": self.contest})
-        if not gql_ok(data) or data['data']['contest'] == None:
+        code, headers, data = json_req(url + '/contests/' + urlescape(self.contest), None, {'Authorization': self.cookie})
+        if code != 200:
             raise BruteError('Login failed: unknown contest')
-    def _gql_req(self, query, post_data=None):
-        key = (query, tuple(sorted(post_data.items())) if post_data != None else None)
-        try: return self._get_cache[key]
+    def _cache_get(self, path):
+        try: return self._get_cache[path]
         except KeyError: pass
-        ans = gql_req(self.url, query, post_data, {"X-Jjs-Auth": self.cookie})
+        ans = json_req(self.url + path, None, {'Authorization': self.cookie})
         with self.cache_lock:
             if self.caching:
-                self._get_cache[key] = ans
+                self._get_cache[path] = ans
         return ans
     def stop_caching(self):
         self._get_cache.clear()
     def task_list(self):
-        code, headers, data = self._gql_req('query($a:String!){contest(name:$a){id,problems{id}}}', {"a": self.contest})
-#       print(data)
-        if not gql_ok(data):
-            raise BruteError("Failed to fetch task list")
-        return [j['id'] for j in data['data']['contest']['problems']]
+        code, headers, data = self._cache_get('/contests/'+urlescape(self.contest)+'/problems')
+        if code != 200: return []
+        return [i['rel_name'] for i in data]
     def submission_list(self):
-        code, headers, data = self._gql_req('query{runs{id,problem{id}}}')
-#       print(data)
-        if gql_ok(data):
-            return list(reversed([i['id'] for i in data['data']['runs']])), list(reversed([i['problem']['id'] for i in data['data']['runs']]))
-        return [], []
+        code, headers, data = self._cache_get('/contests/'+urlescape(self.contest)+'/problems')
+        if code != 200: mapping = {}
+        else: mapping = {i['name']: i['rel_name'] for i in data}
+        code, headers, data = self._cache_get('/runs')
+        if code != 200: return [], []
+        data.reverse()
+        return [i['id'] for i in data if i['contest_id'] == self.contest], [mapping.get(i['problem_name'], i['problem_name']) for i in data if i['contest_id'] == self.contest]
     def submission_results(self, id):
-        code, headers, data = self._gql_req('query($a:Int!){runs(id:$a){invocationProtocol(filter:{compileLog:false,testData:false,output:false,answer:false})}}', {"a": int(id)})
-#       print(code, headers, data)
-        if not gql_ok(data) or len(data['data']['runs']) != 1 or data['data']['runs'][0]['invocationProtocol'] == None:
-#           raise BruteError("Failed to fetch testing protocol")
-            return [], []
-        prot = data['data']['runs'][0]['invocationProtocol']
-        if prot == None: return [], []
-        prot = json.loads(prot)
-        return [self._format_status(i['status']['code']) for i in prot['tests']], ['?.???' for i in prot['tests']]
+        code, headers, data = self._cache_get('/runs/%d/protocol?compile_log=true'%int(id))
+        if code != 200: return [], []
+        return [self._format_status(i['status']['code']) for i in data['tests']], ['?.???' for i in data['tests']]
     def task_ids(self):
         return list(range(len(self.task_list())))
     def submit(self, taskid, lang, text):
@@ -117,123 +111,125 @@ class JJS(Backend):
         if lang not in range(len(cl)): return
         lang = cl[lang][1]
         if isinstance(text, str): text = text.encode('utf-8')
-        code, headers, data = gql_req(self.url, 'mutation($z:String!,$a:String!,$b:String!,$c:String!){submitSimple(toolchain:$b,runCode:$c,problem:$a,contest:$z){id}}', {'b': lang, 'c': base64.b64encode(text).decode('ascii'), 'a': taskid, 'z': self.contest}, {"X-Jjs-Auth": self.cookie})
-#       print(code, headers, data)
-        if not gql_ok(data):
-            if 'errors' in data and len(data['errors']) == 1 and 'extensions' in data['errors'][0] and 'errorCode' in data['errors'][0]['extensions']:
-                raise BruteError('Submit failed: '+data['errors'][0]['extensions']['errorCode'])
+        code, headers, data = json_req(self.url+'/runs', {
+            'toolchain': lang,
+            'code': ''.join(base64.b64encode(text).decode('ascii').split()),
+            'problem': taskid,
+            'contest': self.contest
+        }, {'Authorization': self.cookie})
+        if code != 200:
+            try: msg = 'Submit failed: '+data['detail']['errorCode']
+            except: return
+            else: raise BruteError(msg)
     def status(self):
         ans = {}
-        for i, j in zip(self.task_list(), self.scoreboard()[0][1]):
+        with self.may_cache():
+            data = list(zip(self.task_list(), self.scoreboard()[0][1]))
+        for i, j in data:
             if j == None: ans[i] = None
             elif j['attempts'] < 0: ans[i] = 'Partial solution'
             else: ans[i] = 'OK'
         return ans
     def scores(self):
-        return {i: (j['score'] if j != None else None) for i, j in zip(self.task_list(), self.scoreboard()[0][1])}
+        with self.may_cache():
+            data = list(zip(self.task_list(), self.scoreboard()[0][1]))
+        return {i: (j['score'] if j != None else None) for i, j in data}
     def compiler_list(self, task):
-        code, headers, data = self._gql_req('query{toolchains{id,name}}')
-        if gql_ok(data):
-            return [(i, x['id'], x['name']) for i, x in enumerate(data['data']['toolchains'])]
+        code, headers, data = self._cache_get('/toolchains')
+        if code == 200:
+            return [(i, x['id'], x['name']) for i, x in enumerate(data)]
         else:
-            raise BruteError("Failed to fetch language list")
+            raise BruteError("Failed to fetch compiler list.")
     def _submission_descr(self, id):
         id = int(id)
-        code, headers, data = self._gql_req('query{runs{id,status{code},score,liveStatusUpdate{liveScore,currentTest,finish}}}')
-        if gql_ok(data):
-            for i in data['data']['runs']:
-                if i['id'] == id:
-#                   print(i)
-                    return i
-        return None
-    def _get_lsu(self, id, lsu):
+        code, headers, data = self._cache_get('/runs')
+        if code != 200: return None
+        for i in data:
+            if i['id'] == id:
+                return i
+    def _get_lsu(self, id):
         id = int(id)
+        code, headers, lsu = json_req(self.url+'/runs/%d/live', None, {'Authorization': self.cookie})
+        if code != 200:
+            return self.lsu_cache.get(id, None)
         if lsu['finish']:
             try: del self.lsu_cache[id]
             except KeyError: pass
             return None
-        if id not in self.lsu_cache: self.lsu_cache[id] = {'test': None, 'score': None}
-        if lsu['currentTest'] != None: self.lsu_cache[id]['test'] = lsu['currentTest']
-        if lsu['liveScore'] != None: self.lsu_cache[id]['score'] = lsu['liveScore']
-        return self.lsu_cache[id]
+        with self.cache_lock:
+            if id not in self.lsu_cache: self.lsu_cache[id] = {'test': None, 'score': None}
+            if lsu['current_test'] != None: self.lsu_cache[id]['test'] = lsu['current_test']
+            if lsu['live_score'] != None: self.lsu_cache[id]['score'] = lsu['live_score']
+            return self.lsu_cache[id]
     def _format_status(self, st):
+        if st == 'ACCEPTED' or st == 'TEST_PASSED' or st == 'OK': return 'OK'
         st = st.replace('_', ' ')
-        if st == 'ACCEPTED' or st == 'TEST PASSED': return 'OK'
         return st[:1].upper()+st[1:].lower()
     def compile_error(self, id, *, binary=False, kind=None):
-        if kind in (None, 1):
-            code, headers, data = self._gql_req('query($a:Int!){runs(id:$a){invocationProtocol(filter:{compileLog:true,testData:false,output:false,answer:false})}}', {"a": int(id)})
-            if not gql_ok(data) or len(data['data']['runs']) != 1: return None
-            prot = data['data']['runs'][0]['invocationProtocol']
-            if prot == None: return None
-            prot = json.loads(prot)
-            ans = base64.b64decode(prot.get('compile_stdout', '').encode('ascii'))+base64.b64decode(prot.get('compile_stderr', '').encode('ascii'))
-        elif kind == 3:
-            code, headers, data = self._gql_req('query($a:Int!){runs(id:$a){binary}}', {"a": int(id)})
-            if not gql_ok(data) or len(data['data']['runs']) != 1: return None
-            ans = base64.b64decode(data['data']['runs'][0]['binary'].encode('ascii'))
-        else: return None
-        if not binary: ans = ans.decode('utf-8', 'replace')
+        if kind in (None, 1): # compiler output
+            code, headers, data = self._cache_get('/runs/%d/protocol?compile_log=true')
+            if code != 200: ans = None
+            else: ans = base64.b64decode(data.get('compile_stdout', '').encode('ascii'))+base64.b64decode(data.get('compile_stderr', '').encode('ascii'))
+        elif kind == 3: # binary
+            code, headers, data = get(self.url+'/runs/%d/binary', {'Authorization': self.cookie})
+            if code != 200: ans = None
+            else: ans = data
+        if ans != None and not binary: ans = ans.decode('utf-8', 'replace')
         return ans
     def submission_status(self, id):
         st = self._submission_descr(id)
         if st == None: return None
-        lsu = self._get_lsu(id, st['liveStatusUpdate'])
+        lsu = self._get_lsu(id)
         if lsu != None:
             status = 'Running'
             if lsu['test'] != None: status += ', test '+str(lsu['test'])
             return status
         if st['status'] == None: return 'Running'
         return self._format_status(st['status']['code'])
-#       if isinstance(st, str): return st
-#       elif isinstance(st, dict) and 'Done' in st:
-#          return st['Done'].get('status_name', None)
-#       else: return None
     def submission_source(self, id):
-        code, headers, data = self._gql_req('query($a:Int!){runs(id:$a){source}}', {"a": int(id)})
-        if not gql_ok(data) or len(data['data']['runs']) != 1: return None
-        ans = base64.b64decode(data['data']['runs'][0]['source'].encode('ascii'))
-        return ans
+        code, headers, data = self._cache_get('/runs/%d/source'%int(id))
+        if code != 200: return None
+        return base64.b64decode(data.encode('ascii'))
     def submission_stats(self, id):
         st = self._submission_descr(id)
         if st == None: return None
-        lsu = self._get_lsu(id, st['liveStatusUpdate'])
+        lsu = self._get_lsu(id)
+        code, headers, prot = self._cache_get('/runs/%d/protocol?compile_log=true'%int(id))
+        if code != 200: prot = None
+        ans = {}
         if lsu != None:
-            ans = {'score': lsu['score']}
+            ans['score'] = lsu['score']
             if lsu['test'] != None: ans['tests'] = {'success': lsu['test']}
-            return (ans, None)
-        return ({'score': st['score']}, None)
+        if 'subtasks' in prot and prot['subtasks']:
+            prot['subtasks'].sort(key=lambda i: i['subtask_id'])
+            ans['group_scores'] = [i['score'] for i in prot['subtasks']]
+        return ans
     def submission_score(self, id):
         st = self._submission_descr(id)
         if st == None: return None
-        lsu = self._get_lsu(id, st['liveStatusUpdate'])
+        lsu = self._get_lsu(id)
         if lsu != None: return lsu['score']
-#       if isinstance(st, dict) and 'Done' in st:
-#           return st['Done'].get('score', None)
-#       else: return None
-        return st['score']
+        else: return st['score']
     def get_samples(self, id, *, binary=False):
         def deb64(x):
             ans = base64.b64decode(x.encode('ascii'))
             if not binary: ans = ans.decode('utf-8', 'replace')
             return ans
         ans = {}
-        code, headers, data = self._gql_req('query($a:Int!){runs(id:$a){invocationProtocol(filter:{compileLog:false,testData:true,output:true,answer:true})}}', {"a": int(id)})
-        if not gql_ok(data) or len(data['data']['runs']) != 1: return ans
-        proto = json.loads(data['data']['runs'][0]['invocationProtocol'])
-        for i, j in enumerate(i for i in proto['tests']):
+        code, headers, data = self._cache_get('/runs/%d/protocol?test_data=true&output=true&answer=true'%int(id))
+        if code != 200: return ans
+        for i, j in enumerate(i for i in data['tests']):
             cur = ans[i + 1] = {}
             for k1, k2 in (('test_stdin', 'Input'), ('test_stdout', 'Output'), ('test_stderr', 'Stderr'), ('test_answer', 'Correct')):
                 if k1 in j and j[k1] != None: cur[k2] = deb64(j[k1])
         return ans
     def scoreboard(self):
-        code, headers, data = self._gql_req('query{standingsSimple}')
-        if not gql_ok(data): return []
-        standings = json.loads(data['data']['standingsSimple'])
+        code, headers, data = self._cache_get('/contests/'+urlescape(self.contest)+'/standings')
+        if code != 200: return []
         ans = []
         i = 1
-        while str(i) in standings['parties']:
-            cur = standings['parties'][str(i)]
+        while str(i) in data['parties']:
+            cur = data['parties'][str(i)]
             i += 1
             ans.append(({'name': 'STUB', 'color': cur['stats']['color'], 'total_score': cur['stats']['score']}, []))
             j = 1
@@ -253,16 +249,15 @@ class JJS(Backend):
                 url = self
                 params = {}
             if url.endswith('/'): url = url[:-1]
-            url += '/graphql'
         else:
             url = self.url
             params = dict(self.params)
         url0 = url
         url = url.replace('+jjs', '', 1)
-        code, headers, data = gql_req(url, 'query{contests{id,title}}', {})
+        code, headers, data = json_req(url+'/contests', None)
         ans = []
-        if not gql_ok(data): return ans
-        for i in data['data']['contests']:
+        if code != 200: return ans
+        for i in data:
             params['contest'] = i['id']
-            ans.append((url0[:-7]+'?'+urllib.parse.urlencode(params), i['title'], {}))
+            ans.append((url0+'/?'+urllib.parse.urlencode(params), i['title'], {}))
         return ans
