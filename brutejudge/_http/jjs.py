@@ -71,7 +71,7 @@ class JJS(Backend):
         self.lsu_cache = {}
         self._get_cache = {}
         code, headers, data = json_req(url + '/contests/' + urlescape(self.contest), None, {'Authorization': self.cookie})
-        if code != 200:
+        if code != 200 or data == None:
             raise BruteError('Login failed: unknown contest')
     def _cache_get(self, path):
         try: return self._get_cache[path]
@@ -96,9 +96,9 @@ class JJS(Backend):
         data.reverse()
         return [i['id'] for i in data if i['contest_id'] == self.contest], [mapping.get(i['problem_name'], i['problem_name']) for i in data if i['contest_id'] == self.contest]
     def submission_results(self, id):
-        code, headers, data = self._cache_get('/runs/%d/protocol?compile_log=true'%int(id))
+        code, headers, data = self._cache_get('/runs/%d/protocol?compile_log=true&resource_usage=true'%int(id))
         if code != 200: return [], []
-        return [self._format_status(i['status']['code']) for i in data['tests']], ['?.???' for i in data['tests']]
+        return [self._format_status(i['status']['code']) for i in data['tests']], ['%0.3f'%((i['time_usage']//1000000)/1000) for i in data['tests']]
     def task_ids(self):
         return list(range(len(self.task_list())))
     def submit(self, taskid, lang, text):
@@ -148,7 +148,7 @@ class JJS(Backend):
                 return i
     def _get_lsu(self, id):
         id = int(id)
-        code, headers, lsu = json_req(self.url+'/runs/%d/live'%id, None, {'Authorization': self.cookie})
+        code, headers, lsu = self._cache_get('/runs/%d/live'%id)
         if code != 200:
             return self.lsu_cache.get(id, None)
         if lsu['finish']:
@@ -166,7 +166,7 @@ class JJS(Backend):
         return st[:1].upper()+st[1:].lower()
     def compile_error(self, id, *, binary=False, kind=None):
         if kind in (None, 1): # compiler output
-            code, headers, data = self._cache_get('/runs/%d/protocol?compile_log=true')
+            code, headers, data = self._cache_get('/runs/%d/protocol?compile_log=true&resource_usage=true')
             if code != 200: ans = None
             else: ans = base64.b64decode(data.get('compile_stdout', '').encode('ascii'))+base64.b64decode(data.get('compile_stderr', '').encode('ascii'))
         elif kind == 3: # binary
@@ -176,13 +176,13 @@ class JJS(Backend):
         if ans != None and not binary: ans = ans.decode('utf-8', 'replace')
         return ans
     def submission_status(self, id):
-        st = self._submission_descr(id)
-        if st == None: return None
         lsu = self._get_lsu(id)
         if lsu != None:
             status = 'Running'
             if lsu['test'] != None: status += ', test '+str(lsu['test'])
             return status
+        st = self._submission_descr(id)
+        if st == None: return None
         if st['status'] == None: return 'Running'
         return self._format_status(st['status']['code'])
     def submission_source(self, id):
@@ -190,25 +190,26 @@ class JJS(Backend):
         if code != 200: return None
         return base64.b64decode(data.encode('ascii'))
     def submission_stats(self, id):
-        st = self._submission_descr(id)
-        if st == None: return None
         lsu = self._get_lsu(id)
-        code, headers, prot = self._cache_get('/runs/%d/protocol?compile_log=true'%int(id))
-        if code != 200: prot = None
-        ans = {}
         if lsu != None:
             ans['score'] = lsu['score']
             if lsu['test'] != None: ans['tests'] = {'success': lsu['test']}
+            return ans
+        st = self._submission_descr(id)
+        if st == None: return None
+        ans = {}
+        code, headers, prot = self._cache_get('/runs/%d/protocol?compile_log=true&resource_usage=true'%int(id))
+        if code != 200: prot = None
         if 'subtasks' in prot and prot['subtasks']:
             prot['subtasks'].sort(key=lambda i: i['subtask_id'])
             ans['group_scores'] = [i['score'] for i in prot['subtasks']]
         return ans
     def submission_score(self, id):
-        st = self._submission_descr(id)
-        if st == None: return None
         lsu = self._get_lsu(id)
         if lsu != None: return lsu['score']
-        else: return st['score']
+        st = self._submission_descr(id)
+        if st == None: return None
+        return st['score']
     def get_samples(self, id, *, binary=False):
         def deb64(x):
             ans = base64.b64decode(x.encode('ascii'))
