@@ -48,8 +48,8 @@ def do_googlelogin(self, cmdline):
     Login to the testing system using Google OAuth (the testing system must support such logins).
     """
     cmdline = shlex.split(cmdline)
-    client_id = '894979903815-c44atlfg22sp08rc1ifnfod0lej4jr0j.apps.googleusercontent.com'
-    client_secret = 'Oe8J0rddJ1r70R5Jj_3_d018'
+    client_id = '158805258134-fk2gef9qi727b7rncel01p582md374a0.apps.googleusercontent.com'
+    client_secret = 'scWWMjrZmnQxA6BPz_4dYgxa'
     if cmdline and cmdline[0] == '--client-id':
         client_id = cmdline[1]
         del cmdline[:2]
