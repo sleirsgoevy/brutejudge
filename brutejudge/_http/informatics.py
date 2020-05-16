@@ -220,6 +220,8 @@ class Informatics(Ejudge):
         self.submission_list()
         try: return [d for a, b, c, d in self.subm_list if a == id][0]
         except (ValueError, IndexError): return None
+    def contest_info(self):
+        return ('', {}, {})
     def problem_info(self, id):
         url = "/mod/statements/view3.php?chapterid=%d"%id
         data = self._cache_get(url).decode('utf-8', 'replace')

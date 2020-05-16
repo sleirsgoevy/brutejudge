@@ -1,4 +1,4 @@
-import collections
+import collections, ast, html
 from .libpcms import PCMS as LPCMS
 from brutejudge._http.base import Backend
 from brutejudge.error import BruteError
@@ -154,6 +154,18 @@ class PCMS(Backend):
         raise BruteError("STUB")
     def do_action(self, *args):
         raise BruteError("Not implemented on PCMS")
+    def contest_info(self):
+        props = self._cache_call(self.pcms.get_info)
+        data1 = {}
+        if 'Status' in props and '<script type="text/javascript">' in props['Status']:
+            script = props['Status'].split('<script type="text/javascript">', 1)[1].split('</script>', 1)[0].strip()
+            if script.startswith('clock.init('):
+                qq = ast.literal_eval(script[10:-1]) # not a valid JSON
+                if len(qq) == 5 and qq[2] == 'RUNNING':
+                    data1['contest_time'] = qq[3] / 1000
+                    data1['contest_duration'] = qq[4] / 1000
+        datas = {k: html.unescape(v) for k, v in props.items() if '<' not in v}
+        return ('', datas, data1)
     def problem_info(self, task_id):
         html, base = self._cache_call(self.pcms.get_links)
         return ({}, html2md.html2md(html, None, base))

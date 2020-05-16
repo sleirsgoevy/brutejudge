@@ -53,7 +53,7 @@ class PCMS:
         for i in props_s.split('<td class="key">')[1:]:
             keys.append(html.unescape(i.split('</td>', 1)[0]))
         for i in props_s.split('<td class="value">')[1:]:
-            values.append(html.unescape(i.split('</td>', 1)[0]))
+            values.append(i.split('</td>', 1)[0])
         props = dict(zip(keys, values))
         return props
     def get_messages(self):

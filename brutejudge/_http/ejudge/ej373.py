@@ -11,6 +11,7 @@ def get_urls(main_url):
         main_url = main_url[:-9] + '/user'
     return {
         'contest_list': main_url[:-5]+'/register',
+        'contest_info': main_url + '/main-page/' + sid,
         'summary': main_url + '/view-problem-summary/' + sid,
         'submissions': main_url + '/view-submissions/' + sid + '?all_runs=1',
         'protocol': main_url + '/view-report/' + sid + '?run_id={run_id}',

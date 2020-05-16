@@ -1,4 +1,4 @@
-import ssl, socket, html, collections, urllib.parse
+import ssl, socket, html, collections, urllib.parse, time, math
 import brutejudge._http.ejudge.ej371, brutejudge._http.ejudge.ej373, brutejudge._http.html2md as html2md
 from brutejudge._http.base import Backend
 from brutejudge.error import BruteError
@@ -313,6 +313,32 @@ class Ejudge(Backend):
             if 'tests' not in ans1: ans1['tests'] = {}
             ans1['tests']['success'] = tp
         return (ans1, ans2)
+    def contest_info(self):
+        code, headers, data = self._cache_get(self.urls['contest_info'])
+        data = data.decode('utf-8')
+        try: pbs = '\n'.join(html.unescape(i.split('</b></p>', 1)[0]) for i in data.split('<p><b>')[1:])
+        except IndexError: pbs = ''
+        datas = {}
+        for i in data.split('<tr><td class="b0">')[1:]:
+            i = i.split('</td></tr>', 1)[0] 
+            try: key, value = i.split('<td class="b0">')
+            except IndexError: pass
+            else: datas[html.unescape(key.split('</td>', 1)[0])] = html.unescape(value)
+        data1 = {}
+        for k1, k2 in (('server_time', 'Server time:'), ('contest_start', 'Contest start time'), ('contest_duration', 'Duration:')):
+            if k2 not in datas: continue
+            if datas[k2] == 'Unlimited':
+                data1[k1] = math.inf
+                continue
+            date, s_time = datas[k2].split(' ')
+            year, month, day = map(int, date.split('/'))
+            hour, minute, second = map(int, s_time.split(':'))
+            data1[k1] = time.mktime((year, month, day, hour, minute, second, -1, -1, -1))
+        if 'contest_start' in data1 and 'contest_duration' in data1:
+            data1['contest_end'] = data1['contest_start'] + data1['contest_duration']
+        if 'contest_start' in data1 and 'server_time' in data1:
+            data1['contest_time'] = data1['server_time'] - data1['contest_start']
+        return (pbs, datas, data1)
     def problem_info(self, id):
         code, headers, data = self._cache_get(self.urls['submission'].format(prob_id=id))
         data = data.decode('utf-8')

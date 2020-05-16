@@ -15,12 +15,12 @@ def mb_problem_status(x):
     add_later = {}
     y = []
     for i in x:
-        if i.startswith('      "input_file": '):
-            add_later['input_file'] = i[20:-1]
-        elif i.startswith('      "output_file": '):
-            add_later['output_file'] = i[21:-1]
-        else:
-            y.append(i)
+        #if i.startswith('      "input_file": '):
+        #    add_later['input_file'] = i[20:-1]
+        #elif i.startswith('      "output_file": '):
+        #    add_later['output_file'] = i[21:-1]
+        #else:
+        y.append(i)
     y = '\n'.join(y)
     try: y = json.loads(y)
     except json.JSONDecodeError: return None
@@ -177,6 +177,23 @@ class EJFuse(Ejudge):
         if code != 200 or not data or not data['ok']:
             raise BruteError("Failed to fetch compiler list.")
         return [(i['id'], i['short_name'], i['long_name']) for i in data['result']['compilers']]
+    def contest_info(self):
+        code, headers, data = self._cache_get(self.url+'?SID=%s&EJSID=%s&action=contest-status-json&json=1'%self.cookies, False)
+        data = mbjson(data)
+        if code != 200 or not data or not data['ok']:
+            raise BruteError("Failed to fetch contest info.")
+        datas = {}
+        data1 = {}
+        datas['Server time:'] = data1['server_time'] = data['server_time']
+        datas['Contest start time'] = data1['contest_start'] = data['start_time']
+        datas['Duration:'] = data1['contest_duration'] = data['duration']
+        if 'end_time' in data:
+            datas['contest_end'] = data['end_time']
+        elif 'contest_start' in datas and 'contest_duration' in datas:
+            datas['contest_end'] = datas['contest_start'] + datas['contest_duration']
+        if 'server_time' in datas and 'contest_start' in datas:
+            datas['contest_time'] = datas['server_time'] - datas['contest_start']
+        return ('', data1, datas)
     def submission_stats(self, subm_id):
         subm = self._submission_descr(subm_id)
         ans = {}

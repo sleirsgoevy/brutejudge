@@ -246,6 +246,8 @@ class Informatics(Ejudge):
     def submission_score(self, id):
         data = self._submission_object(id)
         return data['ejudge_score'] if data['ejudge_score'] >= 0 else None
+    def contest_info(self):
+        return ('', {}, {})
     def problem_info(self, id):
         url = "/mod/statements/view3.php?chapterid=%d"%id
         data = self._cache_get(url).decode('utf-8', 'replace')

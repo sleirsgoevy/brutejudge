@@ -28,6 +28,7 @@ def get_spec_name(s):
     return ' '.join(i for i in s.split() if i not in ('__char', '__int', '__unsigned', '__hex') and not i.startswith('__%'))
 
 def format(s, options=set(), stdio=True):
+    "type1 a, type2 b -> type_ans1, type_ans2: f1(a, b), f2(a, b)"
     args, exprs = s.split(':', 1)
     args, retvals = args.rsplit('->', 1)
     args = [i.strip() for i in args.split(',')]

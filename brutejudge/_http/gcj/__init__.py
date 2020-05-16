@@ -156,6 +156,12 @@ class GCJ(Backend):
                 ans['tests']['success' if i['verdict__str'] == 'CORRECT' else 'fail'] += 1
                 ans['tests']['total'] += 1
         return (ans, None)
+    def contest_info(self):
+        db = self._get_which('dashboard')
+        data1 = {'contest_start': db['challenge']['start_ms'] / 1000, 'contest_end': db['challenge']['end_ms'] / 1000}
+        data1['contest_duration'] = data1['contest_end'] - data1['contest_start']
+        datas = {'Contest start time': time.ctime(data1['contest_start']), 'Duration:': time.ctime(data1['contest_duration'])}
+        return ('', datas, data1)
     def problem_info(self, task):
         for i in self._get_which('dashboard')['challenge']['tasks']:
             if int(i['id'], 16) == task:

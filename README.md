@@ -37,6 +37,7 @@ Then type `brutejudge` into the prompt.
 clars              inherit missing stub        stub        stub       stub    OK      OK     
 compile_error      OK      OK      OK          OK          OK         OK      OK      OK     
 compiler_list      OK      OK      OK          OK          OK         OK      OK      OK     
+contest_info       OK      OK      OK          OK          missing    OK      OK      OK     
 contest_list       inherit OK      inherit     inherit     inherit    inherit inherit OK     
 detect             OK      OK      OK          OK          OK         OK      OK      OK     
 do_action          inherit missing stub        OK          missing    stub    stub    OK     

@@ -1,6 +1,7 @@
 def get_urls(main_url):
     return {
         'contest_list': main_url.split('?', 1)[0][:-6]+'register',
+        'contest_info': main_url + '&action=2',
         'summary': main_url + '&action=137',
         'submissions': main_url + '&action=140&all_runs=1',
         'protocol': main_url + '&action=37&run_id={run_id}',

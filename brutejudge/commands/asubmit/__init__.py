@@ -1,6 +1,6 @@
 from brutejudge.http import submit, task_list, task_ids, submission_list, compiler_list, may_cache
 from brutejudge.error import BruteError
-import os.path, shlex
+import os.path, shlex, sys
 
 def get_lang_id(self, lang_name, task_id):
     try: task_id = task_ids(self.url, self.cookie)[task_id]
@@ -20,7 +20,7 @@ def get_possible_lang_id(self, lang_names, task_id):
 def check_exists(fname, options=set()):
     return os.path.exists(fname) or '-exist' in options
 
-def do_asubmit(self, cmd, afmt=False):
+def do_asubmit(self, cmd, *, afmt=False):
     """
     usage: asubmit [-w] [-x <extension>] <task> <lang_id> <file>
 
@@ -44,6 +44,32 @@ def do_asubmit(self, cmd, afmt=False):
         if modname[:1] == '.': modname = 'brutejudge.commands.asubmit.format_'+modname[1:]
     if len(sp) != (1 if afmt else 3):
         return self.do_help('asubmit')
+    try:
+        name = sp[-1]
+        module = None
+        ext = os.path.splitext(name)[1][1:]
+        modname, *modargs = modname.split(',')
+        modargs = set(modargs)
+        if not modname: modname = 'brutejudge.commands.asubmit.format_'+ext
+        try:
+            module = __import__(modname, fromlist=True)
+        except ImportError: pass
+        if not getattr(module, 'check_exists', check_exists)(name, modargs):
+            raise BruteError("File not found.")
+        if hasattr(module, 'read_file'):
+            data = module.read_file(name, modargs)
+        else:
+            with open(name, 'rb') as file:
+                data = file.read()
+        if hasattr(module, 'format'):
+            data = module.format(data, modargs)
+    except UnicodeDecodeError:
+        raise BruteError("File is binary.")
+    if afmt:
+        if isinstance(data, str): data = data.encode('utf-8')
+        sys.stdout.buffer.write(data)
+        sys.stdout.buffer.flush()
+        return
     with may_cache(self.url, self.cookie):
         tasks = task_list(self.url, self.cookie)
         try: task_id = tasks.index(sp[0])
@@ -51,27 +77,6 @@ def do_asubmit(self, cmd, afmt=False):
             raise BruteError("No such task.")
         if not sp[1].isnumeric():
             sp[1] = get_lang_id(self, sp[1], task_id)
-        try:
-            name = sp[2]
-            module = None
-            ext = os.path.splitext(name)[1][1:]
-            modname, *modargs = modname.split(',')
-            modargs = set(modargs)
-            if not modname: modname = 'brutejudge.commands.asubmit.format_'+ext
-            try:
-                module = __import__(modname, fromlist=True)
-            except ImportError: pass
-            if not getattr(module, 'check_exists', check_exists)(name, modargs):
-                raise BruteError("File not found.")
-            if hasattr(module, 'read_file'):
-                data = module.read_file(name, modargs)
-            else:
-                with open(name, 'rb') as file:
-                    data = file.read()
-            if hasattr(module, 'format'):
-                data = module.format(data, modargs)
-        except UnicodeDecodeError:
-            raise BruteError("File is binary.")
         before = submission_list(self.url, self.cookie)[0]
         submit(self.url, self.cookie, task_id, int(sp[1]), data)
     after = submission_list(self.url, self.cookie)[0]

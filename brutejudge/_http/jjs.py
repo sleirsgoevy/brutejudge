@@ -22,7 +22,7 @@ class JJS(Backend):
     @staticmethod
     def detect(url):
         sp = url.split('/')
-        return sp[0] in ('http+jjs:', 'https+jjs:') and not sp[1]
+        return len(sp) >= 2 and sp[0] in ('http+jjs:', 'https+jjs:') and not sp[1]
     @staticmethod
     def login_type(url):
         url, params = url.split('?')
@@ -175,6 +175,10 @@ class JJS(Backend):
             else: ans = data
         if ans != None and not binary: ans = ans.decode('utf-8', 'replace')
         return ans
+    def contest_info(self):
+        code, headers, data = self._cache_get('/system/is-dev')
+        if code != 200: return ('', {}, {})
+        return ('', {}, {'jjs_devmode': data})
     def submission_status(self, id):
         lsu = self._get_lsu(id)
         if lsu != None:
