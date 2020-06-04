@@ -1,17 +1,23 @@
+import collections
 from brutejudge.http import task_list
 from brutejudge.error import BruteError
 
-class TaskList:
-    def __init__(self, obj):
-        self.obj = obj
-        self.k2v = {}
-        self.v2k = {}
-    def __call__(self):
-        return [self.k2v.get(i, i) for i in type(self.obj).task_list(self.obj)]
-
-def setup_taskalias(self):
-    if not isinstance(self.task_list, TaskList):
-        self.task_list = TaskList(self)
+class TaskAlias:
+    def __init__(self, parent):
+        self.parent = parent
+        self.taskalias_k2v = {}
+        self.taskalias_v2k = {}
+    def task_list(self):
+        return [self.taskalias_k2v.get(i, i) for i in self.parent.task_list()]
+    def submission_list(self):
+        a, b = self.parent.submission_list()
+        return a, [self.taskalias_k2v.get(i, i) for i in b]
+    def status(self):
+        return collections.OrderedDict((self.taskalias_k2v.get(k, k), v) for k, v in self.parent.status().items())
+    def scores(self):
+        return collections.OrderedDict((self.taskalias_k2v.get(k, k), v) for k, v in self.parent.scores().items())
+    def __getattr__(self, attr):
+        return getattr(self.parent, attr)
 
 def do_taskalias(self, cmd):
     """
@@ -25,7 +31,7 @@ def do_taskalias(self, cmd):
     eq = ['=' in i for i in cmd]
     if not (cmd and (all(eq) or not any(eq))):
         return self.do_help('taskalias')
-    setup_taskalias(self.url)
+    if not isinstance(self.url, TaskAlias): self.url = TaskAlias(self.url)
     if any(eq):
         pairs = [i.split('=', 1) for i in cmd]
     else:
@@ -34,10 +40,10 @@ def do_taskalias(self, cmd):
             raise BruteError("The number of arguments must match the number of tasks.")
         pairs = list(zip(tasks, cmd))
     for k, v in pairs:
-        try: k1 = self.url.task_list.v2k[k]
+        try: k1 = self.url.taskalias_v2k[k]
         except KeyError: pass
         else:
-            del self.url.task_list.v2k[k]
+            del self.url.taskalias_v2k[k]
             k = k1
-        self.url.task_list.v2k[v] = k
-        self.url.task_list.k2v[k] = v
+        self.url.taskalias_v2k[v] = k
+        self.url.taskalias_k2v[k] = v

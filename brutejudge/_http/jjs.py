@@ -207,7 +207,7 @@ class JJS(Backend):
         if 'subtasks' in prot and prot['subtasks']:
             prot['subtasks'].sort(key=lambda i: i['subtask_id'])
             ans['group_scores'] = [i['score'] for i in prot['subtasks']]
-        return ans
+        return (ans, '')
     def submission_score(self, id):
         lsu = self._get_lsu(id)
         if lsu != None: return lsu['score']
