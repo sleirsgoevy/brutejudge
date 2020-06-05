@@ -15,14 +15,20 @@ def b64decode(s):
 
 class GCJ(Backend):
     @staticmethod
-    def detect(url):
+    def _detect(url):
         url = url.split('/')
-        return url[:3] == ['https:', '', 'codingcompetitions.withgoogle.com'] and url[4] == 'round'
+        return len(url) > 4 and url[:3] == ['https:', '', 'codingcompetitions.withgoogle.com'] and url[4] == 'round'
+    @staticmethod
+    def detect(url):
+        return url.startswith('https://codingcompetitions.withgoogle.com/')
     @staticmethod
     def login_type(url):
-        return ['goauth:email profile openid https://www.googleapis.com/auth/codejam']
+        if url.count('/') == 3: return ['contest_list']
+        else: return ['goauth:email profile openid https://www.googleapis.com/auth/codejam']
     def __init__(self, url, login, password, token=None):
         Backend.__init__(self)
+        if not self._detect(url):
+            raise BruteError("Invalid GCJ URL supplied")
         self.round = url.split('#', 1)[0].split('/')[5]
         if not set(self.round).issubset('0123456789abcdef'):
             raise BruteError("Invalid GCJ URL supplied")
@@ -171,3 +177,12 @@ class GCJ(Backend):
     def stop_caching(self):
         self._get_cache.clear()
     def clars(self): return [] #STUB
+    def contest_list(self):
+        if not isinstance(self, str): return []
+        competition = self.rsplit('/', 1)[-1]
+        code, headers, data = get('https://codejam.googleapis.com/poll?p=e30')
+        if code != 200: raise BruteError("Failed to fetch contest list.")
+        data = json.loads(b64decode(data).decode('utf-8', 'replace'))
+        contests = [(j['start_ms'], j['title'], j['id']) for i in data['adventures'] if i['competition__str'].replace('_', '').lower() == competition for j in i['challenges']]
+        contests.sort()
+        return [(self+'/round/'+k, j, {}) for i, j, k in contests]
