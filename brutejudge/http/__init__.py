@@ -1,8 +1,8 @@
-import brutejudge._http.ejudge, brutejudge._http.ejudge.ejfuse, brutejudge._http.pcms, brutejudge._http.jjs, brutejudge._http.informatics, brutejudge._http.informatics_new, brutejudge._http.codeforces, brutejudge._http.gcj, urllib.request
+import brutejudge._http.ejudge, brutejudge._http.ejudge.ejfuse, brutejudge._http.pcms, brutejudge._http.jjs, brutejudge._http.informatics, brutejudge._http.informatics_new, brutejudge._http.codeforces, brutejudge._http.gcj, brutejudge._http.cache, urllib.request
 from brutejudge._http.ejudge import contest_name
 from brutejudge.error import BruteError
 
-backend_path = [brutejudge._http.ejudge.ejfuse.EJFuse, brutejudge._http.jjs.JJS, brutejudge._http.informatics.Informatics, brutejudge._http.informatics_new.Informatics, brutejudge._http.codeforces.CodeForces, brutejudge._http.gcj.GCJ, brutejudge._http.pcms.PCMS, brutejudge._http.ejudge.Ejudge]
+backend_path = [brutejudge._http.cache.AggressiveCacheBackend, brutejudge._http.ejudge.ejfuse.EJFuse, brutejudge._http.jjs.JJS, brutejudge._http.informatics.Informatics, brutejudge._http.informatics_new.Informatics, brutejudge._http.codeforces.CodeForces, brutejudge._http.gcj.GCJ, brutejudge._http.pcms.PCMS, brutejudge._http.ejudge.Ejudge]
 
 def login(url, login, password, **kwds):
     for i in backend_path:
