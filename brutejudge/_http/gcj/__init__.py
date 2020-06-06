@@ -60,8 +60,13 @@ class GCJ(Backend):
     def _debug_req(self, which, data={}):
         import pprint, pydoc
         pydoc.pager(pprint.pformat(self._json_req('https://codejam.googleapis.com/%s/%s/poll'%(which, self.round), data)))
+    def _get_dashboard(self, q):
+        ans = self._get_which('dashboard', q)
+        ans['challenge']['tasks'].sort(key=lambda x: x['title'])
+        ans['challenge']['tasks'].sort(key=lambda x: sum(i['value'] for i in x['tests']))
+        return ans
     def task_ids(self):
-        data = self._get_which('dashboard', "Failed to fetch task list.")
+        data = self._get_dashboard("Failed to fetch task list.")
         return [int(i['id'], 16) for i in data['challenge']['tasks']]
     def task_list(self):
         return [hex(i)[2:] for i in self.task_ids()]
@@ -94,7 +99,7 @@ class GCJ(Backend):
         return ans
     def submit(self, task, lang, code):
         if isinstance(code, bytes): code = code.decode('utf-8', 'replace')
-        try: tasks = self._get_which('dashboard', '')
+        try: tasks = self._get_dashboard('')
         except BruteError: return
         else:
             try: task = tasks['challenge']['tasks'][task]['id']
@@ -143,7 +148,7 @@ class GCJ(Backend):
     def do_action(self, *args):
         raise BruteError("Actions are not supported on GCJ.")
     def compiler_list(self, task):
-        return [(i['id'], i['id__str'].lower(), i['name']) for i in self._get_which('dashboard', "Failed to fetch compiler list.")['languages']]
+        return [(i['id'], i['id__str'].lower(), i['name']) for i in self._get_dashboard("Failed to fetch compiler list.")['languages']]
     def submission_stats(self, subm_id):
         data = self._get_which('attempts')
         for subm in data['attempts']:
@@ -163,13 +168,13 @@ class GCJ(Backend):
                 ans['tests']['total'] += 1
         return (ans, None)
     def contest_info(self):
-        db = self._get_which('dashboard')
+        db = self._get_dashboard("Failed to fetch contest info.")
         data1 = {'contest_start': db['challenge']['start_ms'] / 1000, 'contest_end': db['challenge']['end_ms'] / 1000}
         data1['contest_duration'] = data1['contest_end'] - data1['contest_start']
         datas = {'Contest start time': time.ctime(data1['contest_start']), 'Duration:': time.ctime(data1['contest_duration'])}
         return ('', datas, data1)
     def problem_info(self, task):
-        for i in self._get_which('dashboard')['challenge']['tasks']:
+        for i in self._get_dashboard("Failed to fetch problem info.")['challenge']['tasks']:
             if int(i['id'], 16) == task:
                 return ({}, html2md(i['statement']))
     def submission_score(self, subm_id):

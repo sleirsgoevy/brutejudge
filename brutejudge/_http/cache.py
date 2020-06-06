@@ -2,6 +2,10 @@ class AggressiveCacheBackend:
     @staticmethod
     def detect(url):
         return url.startswith('cached:')
+    @staticmethod
+    def login_type(url):
+        import brutejudge.http
+        return brutejudge.http.login_type(url[7:])
     def __init__(self, url, login, password, **kwargs):
         import brutejudge.http
         self.parent = brutejudge.http.login(url[7:], login, password, **kwargs)[0]
