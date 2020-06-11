@@ -25,14 +25,24 @@ def html2md(data, dload_prefix=None, base=None):
     data = data.split('<')
     ans = do_unescape(data[0])
     is_code = False
+    hrefs = []
     for i in data[1:]:
         if i.startswith('a href="'):
-            href, i = i[8:].split('">', 1)
+            href, i = i[8:][1].split('">', 1)
             href = do_unescape(href.split('"', 1)[0], is_code)
             if base != None: href = urllib.parse.urljoin(base, href)
             if dload_prefix != None and href.startswith(dload_prefix):
                 href = 'file '+href[len(dload_prefix):]
-            ans += '['+href+']('+do_unescape(i, is_code)
+            hrefs.append(href)
+            ans += '['+do_unescape(i, is_code)
+        elif i.startswith('img '):
+            x, i = i.split('>', 1)
+            src = x.split('src="', 1)[1].split('"', 1)[0]
+            src = do_unescape(src.split('"', 1)[0], is_code)
+            if base != None: src = urllib.parse.urljoin(base, src)
+            if dload_prefix != None and src.startswith(dload_prefix):
+                src = 'file '+src[len(dload_prefix):]
+            ans += '![]('+src+')'
         elif any(i.startswith('h%d>'%x) for x in range(1, 7)):
             d, i = i.split('>', 1)
             ans += '\n\n'+'#'*int(d[1:])+' '+do_unescape(i, is_code)
@@ -41,7 +51,7 @@ def html2md(data, dload_prefix=None, base=None):
         elif any(i.startswith(x) for x in ('br>', 'br/>', '/h1>', '/h2>', '/h3>', '/h4>', '/h5>', '/h6>', '/p>', '/li>', '/div>')):
             ans += '\n\n' + do_unescape(i.split('>', 1)[1], is_code)
         elif i.startswith('/a>'):
-            ans += ')' + do_unescape(i[3:], is_code)
+            ans += ']('+hrefs.pop()+')'+do_unescape(i[3:], is_code)
         elif i.startswith('sub>') or i.startswith('sub '):
             ans += '[' + do_unescape(i.split('>', 1)[-1], is_code)
         elif i.startswith('/sub>'):
@@ -54,8 +64,14 @@ def html2md(data, dload_prefix=None, base=None):
             if i.startswith('/pre>'):
                 ans += '\n```'
                 is_code = False
+            elif i.startswith('/code>'):
+                ans += '`'
+                is_code = False
             elif i.startswith('pre>') or i.startswith('pre '):
                 ans += '```\n'
+                is_code = True
+            elif i.startswith('code>') or i.startswith('code '):
+                ans += '`'
                 is_code = True
             if '>' not in i or not validate_tag(i.split('>', 1)[0]):
                 ans += '<' + do_unescape(i, is_code)

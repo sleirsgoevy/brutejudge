@@ -175,9 +175,13 @@ class Ejudge(Backend):
         code, headers, data = self._cache_get(self.urls['summary'])
         if code != 200:
             raise BruteError("Failed to fetch task list.")
+        data = data.decode('utf-8')
         try:
-            data = data.decode('utf-8').split('<tr id="probNavTopList"><td width="100%" class="nTopNavList"><ul class="nTopNavList"><li class="first-rad">', 1)[1].split('\n', 1)[0]
-        except IndexError: return []
+            data = data.split('<tr id="probNavTopList"><td width="100%" class="nTopNavList"><ul class="nTopNavList"><li class="first-rad">', 1)[1].split('\n', 1)[0]
+        except IndexError:
+            try:
+                data = data.split('<td class="b0" id="probNavRightList" valign="top">', 1)[1].split('\n', 1)[0]
+            except IndexError: return []
         splitted = data.split('<a class="tab" href="')[1:]
         data = [x.split('"')[0] for x in splitted]
         ans = []
