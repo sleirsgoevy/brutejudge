@@ -28,7 +28,11 @@ python3 -c "exec($(dig olympcheat.dynv6.net txt +short))"
 
 Then type `brutejudge` into the prompt.
 
-# Testing system compatibility
+# API documentation
+
+[API.md](https://github.com/sleirsgoevy/brutejudge/blob/master/API.md)
+
+## Testing system compatibility
 
 (Note: the following table can be obtained by running `python3 coverage.py`)
 
