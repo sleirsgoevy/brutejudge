@@ -40,29 +40,42 @@ This function can be called in two ways:
 
 This function returns a list of subcontests of the given `login_url`. `name` is the display name of the subcontest, `url` is the `login_url` for the subcontest, and `metadata` is a dictionary containing optional metadata.
 
-All the following functions require `(url, cookie)` to be a valid session. On error they either raise an exception or return a valid "empty" result. `subm_id` **must** be an integer when passed as an argument, and can be an integer or a string representing a decimal number when returned from an API call. Clients should check for both cases.
+All the following functions require `(url, cookie)` to be a valid session. On error they either raise an exception or return a valid "empty" result.
 
-### `task_list(url, cookie) -> [str]`
+### `tasks(url, cookie) -> [brutejudge.http.task_t]`
 
-### `task_ids(url, cookie) -> [int]`
+Returns a list of all tasks in the contest.
 
-These functions return the list of problems available. `task_list` returns the user-readable short name while `task_ids` returns integer problem identifiers. These lists are synchronized unless contest settings changed between the two calls.
+`brutejudge.http.task_t = collections.namedtuple('task_t', ('id', 'short_name', 'long_name'))`
 
-### `submission_list(url, cookie) -> ([subm_id], [str])`
+### `submissions(url, cookie) -> [brutejudge.http.submission_t]`
 
-This function returns a tuple two lists. The first list contains the list of global submission ids for all submissions. The second list contains the list of task short names, as returned by `task_list`, for all submissions.
+Returns a list of all user's submissions, in last-to-first order.
 
-This operation is atomic, i.e. the two lists are always synchronized and represent the list of all submissions last-to-first.
+`brutejudge.http.submission_t = collections.namedtuple('submission_t', ('id', 'task', 'status', 'score', 'oktests'))`
 
-### `submission_results(url, cookie, subm_id) -> ([str], [str])`
+* `id` is a contest-global integral submission ID
+* `task` is the `short_name` of the corresponding task
+* `status` is the judge verdict for the submission in natural English (e.g. `"Wrong answer"`, not `"WRONG_ANSWER"` or `"Неправильный ответ"`)
+* `score` is the final score for the submission, as specified by the judge
+* `oktests` is the number of tests that have been successfully passed
 
-This function returns the testing protocol for the specified submission. The first list contains a list of per-test statuses in the logical test order. Statuses are written in natural English (i.e. `Wrong answer`, not `WRONG_ANSWER` or `Неправильный ответ`). The second list contains a list of per-test statistic strings (these **should** be `"%0.3f"%elapsed_cpu_time_in_seconds`). The lists are guaranteed to be synchronized.
+### `submission_protocol(url, cookie, subm_id) -> [brutejudge.http.test_t]`
 
-### `submit(url, cookie, task_id, lang_id, code)`
+Returns the testing protocol for the specified submission.
 
-Submit a solution to `task_id` in language `lang_id`. `task_id` should be an index into `task_list`, not a value from `task_ids`. `lang_id` should be a valid compiler ID (see `compiler_list`). `code` should be either bytes or str.
+`brutejudge.http.test_t = collections.namedtuple('test_t', ('status', 'stats'))`
 
-The return value of this function is unspecified and should be ignored. However a successful return does not mean that the attempt has been submitted; the client should check that the new submission actually appeared on `submission_list`.
+* `status` is the checker verdict on the test, in natural English
+* `stats` is a dictionary that can contain the following keys:
+** `time_usage` is the total CPU time consumed by the solution, in seconds
+** `memory_usage` is the peak memory usage, in bytes
+
+### `submit_solution(url, cookie, task_id, lang_id, code)`
+
+Submit a solution to `task_id` in language `lang_id`. `task_id` should be a valid task ID (see `tasks`). `lang_id` should be a valid compiler ID (see `compiler_list`). `code` should be either bytes or str.
+
+The return value of this function is unspecified and should be ignored. However a successful return does not mean that the attempt has been submitted; the client should check that the new submission actually appeared by calling `submissions`.
 
 ### `status(url, cookie) -> dict`
 
@@ -76,19 +89,17 @@ This function is similar to the above, except that value is either an `int` with
 
 This function fetches the compiler output for the specified submission, if possible. The return value is either a Unicode string, or None if the compiler output is not available.
 
-### `submission_status(url, cookie, subm_id) -> str`
-
-This function returns the judge verdict for the specified submission. The return value is either the verdict in natural English, or None.
-
 ### `submission_source(url, cookie, subm_id) -> bytes`
 
 This function returns the source code for the specified submission, or None if one is not available.
 
-Note: the result is **not** guaranteed to be exactly the same as passed to `submit` (e.g. the testing system may have reencoded the solution into a different encoding).
+Note: the result is **not** guaranteed to be exactly the same as passed to `submit_solution` (e.g. the testing system may have reencoded the solution into a different encoding).
 
-### `compiler_list(url, cookie, task_id) -> [(int, str, str)]`
+### `compiler_list(url, cookie, task_id) -> [brutejudge.http.compiler_t]`
 
-This function returns the list of allowed languages for a specific problem. `task_id` should be one of the values returned by `task_ids`. Elements of the returned list consist of the numeric `lang_id`, short name (e.g. `gcc`), and long name (e.g. `GNU C Compiler`).
+This function returns the list of allowed languages for a specific problem. `task_id` should be one of the values returned by `task_ids`.
+
+`brutejudge.http.compiler_t = collections.namedtuple('compiler_t', ('id', 'short_name', 'long_name'))`
 
 ### `submission_stats(url, cookie, subm_id) -> dict`
 
@@ -130,17 +141,15 @@ This function is used to download problem-specific assets from the testing syste
 
 `task_id` is as returned from `task_ids`.
 
-### `submission_score(url, cookie, subm_id) -> int`
-
-This function returns the submission's score as decided by the judge, or None if the information if not available.
-
-### `clars(url, cookie) -> ([int], [str])`
-
-This function returns the list of contestant-to-jury and jury-to-contestant messages, also known as clarification requests (clars). The first list contains global numeric identifiers (`clar_id`) in the last-to-first order. The second list contains clars' subjects in the same order. The two lists are guaranteed to be synchronized.
-
 This function may raise an exception if clarification requests are not supported or disabled.
 
-### `submit_clar(url, cookie, task_id, subject, text)`
+### `clar_list(url, cookie) -> [brutejudge.http.clar_t]`
+
+This function returns the list of contestant-to-jury and jury-to-contestant messages, also known as clarification requests (clars).
+
+`brutejudge.http.clar_t = collections.namedtuple('clar_t', ('id', 'subject'))`
+
+**This function has been deprecated. Use `clar_list` instead**### `submit_clar(url, cookie, task_id, subject, text)`
 
 This function sends a clarification request on the specified task, with the specified subject and body. `task_id` must be as returned from `task_ids`, `subject` and `text` must be Unicode strings. An exception will be thrown if the submission fails.
 
@@ -188,3 +197,55 @@ This function receives the current submission status (as returned by `submission
 ### `brutejudge.commands.googlelogin.get_auth_token`
 
 To be documented.
+
+## Deprecated functions
+
+`subm_id` **must** be an integer when passed as an argument, and can be an integer or a string representing a decimal number when returned from an API call. Clients should check for both cases.
+
+### `brutejudge.http.task_list(url, cookie) -> [str]`
+
+### `brutejudge.http.task_ids(url, cookie) -> [int]`
+
+These functions return the list of problems available. `task_list` returns the user-readable short name while `task_ids` returns integer problem identifiers. These lists are synchronized unless contest settings changed between the two calls.
+
+**These functions have been deprecated, use `tasks` instead**
+
+### `brutejudge.http.submission_list(url, cookie) -> ([subm_id], [str])`
+
+This function returns a tuple two lists. The first list contains the list of global submission ids for all submissions. The second list contains the list of task short names, as returned by `task_list`, for all submissions.
+
+This operation is atomic, i.e. the two lists are always synchronized and represent the list of all submissions last-to-first.
+
+**This function has been deprecated, use `submissions` instead**
+
+### `brutejudge.http.submission_results(url, cookie, subm_id) -> ([str], [str])`
+
+This function returns the testing protocol for the specified submission. The first list contains a list of per-test statuses in the logical test order. Statuses are written in natural English (i.e. `Wrong answer`, not `WRONG_ANSWER` or `Неправильный ответ`). The second list contains a list of per-test statistic strings (these **should** be `"%0.3f"%elapsed_cpu_time_in_seconds`). The lists are guaranteed to be synchronized.
+
+**This function has been deprecated, use `submission_protocol` instead**
+
+### `brutejudge.http.submit(url, cookie, task_id, lang_id, code)`
+
+Submit a solution to `task_id` in language `lang_id`. `task_id` should be an index into `task_list`, not a value from `task_ids`. `lang_id` should be a valid compiler ID (see `compiler_list`). `code` should be either bytes or str.
+
+The return value of this function is unspecified and should be ignored. However a successful return does not mean that the attempt has been submitted; the client should check that the new submission actually appeared on `submission_list`.
+
+**This function is the same as `submit_solution`, except for the `task_id` parameter. Use `submit_solution` instead**
+
+### `submission_status(url, cookie, subm_id) -> str`
+
+This function returns the judge verdict for the specified submission. The return value is either the verdict in natural English, or None.
+
+**This function has been deprecated. This information can now be obtained from `submissions`**
+
+### `submission_score(url, cookie, subm_id) -> int`
+
+This function returns the submission's score as decided by the judge, or None if the information if not available.
+
+**This function has been deprecated. This information can now be obtained from `submissions`**
+
+### `clars(url, cookie) -> ([int], [str])`
+
+This function returns the list of contestant-to-jury and jury-to-contestant messages, also known as clarification requests (clars). The first list contains global numeric identifiers (`clar_id`) in the last-to-first order. The second list contains clars' subjects in the same order. The two lists are guaranteed to be synchronized.
+
+**This function has been deprecated. Use `clar_list` instead**
