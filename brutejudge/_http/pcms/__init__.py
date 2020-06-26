@@ -3,6 +3,7 @@ from .libpcms import PCMS as LPCMS
 from brutejudge._http.base import Backend
 from brutejudge.error import BruteError
 import brutejudge._http.html2md as html2md
+import brutejudge._http.types as bjtypes
 
 class PCMS(Backend):
     @staticmethod
@@ -32,51 +33,63 @@ class PCMS(Backend):
         with self.cache_lock:
             if self.caching: self._call_cache[func, args] = ans
         return ans
-    def task_list(self):
-        try: return self.pcms.get_submit()[0]
+    def tasks(self):
+        try: return [bjtypes.task_t(i, j, None) for i, j in enumerate(self.pcms.get_submit()[0])]
         except: raise BruteError("Failed to fetch task list.")
-    def submission_list(self):
+    def submissions(self):
         x = self._cache_call(self.pcms.get_submissions)
+        x = list(sorted(x.items(), key=lambda x:x[0]))
         data = []
-        for t, (k, v) in enumerate(sorted(x.items(), key=lambda x:x[0])):
+        sid_to_subm = {}
+        for t, (k, v) in enumerate(x):
             for i in v:
-                data.append((int(i[1]['time'].replace(':', '')), int(i[1]['attempt']), int(i[1]['attempt']) * len(x) + t, k))
+                sid = int(i[1]['attempt']) * len(x) + t
+                sid_to_subm[sid] = i
+                data.append((int(i[1]['time'].replace(':', '')), int(i[1]['attempt']), sid, k))
         data.sort()
         for _, _, i, j in data:
             if i not in self._subms_set:
                 self._subms_set.add(i)
                 self._subms.append((i, j))
-        a = []
-        b = []
-        for i, j in reversed(self._subms):
-            a.append(i)
-            b.append(j)
-        return (a, b)
+        ans = []
+        for sid, task_id in reversed(self._subms):
+            try: subm = sid_to_subm[sid]
+            except KeyError: status = score = oktests = None
+            else:
+                status = self._remove_tags(subm['outcome']) if 'outcome' in subm else None
+                if status == 'Accepted': status = 'OK'
+                score = int(subm['score'].split(' = ', 1)[1]) if 'score' in subm else None
+                ans.append(bjtypes.submission_t(sid, task_id, status, score, None))
+        return ans
     def _decode_subm_id(self, subm_id):
         subm_id = int(subm_id)
         tasks = self.task_list()
         attempt, taskid = divmod(subm_id, len(tasks))
         task = tasks[taskid]
         return (task, attempt)
-    def submission_results(self, subm_id):
+    def submission_protocol(self, subm_id):
         task, attempt = self._decode_subm_id(subm_id)
         proto = self._cache_call(self.pcms.get_protocol, task, attempt)
-        outcomes = []
-        times = []
         if proto == None:
             raise BruteError("Failed to fetch testing protocol.")
+        ans = []
         for i in proto:
             if 'outcome' not in i[1]: continue
-            outcomes.append(self._remove_tags(i[1]['outcome']))
-            if outcomes[-1] == 'Accepted': outcomes[-1] = 'OK'
+            outcome = self._remove_tags(i[1]['outcome'])
+            if outcome == 'Accepted': outcome = 'OK'
+            stats = {}
             try:
-                t = int(i[1]['time'].split()[0])
-                times.append(str(t / 1000))
-            except KeyError: times.append('')
-        return (outcomes, times)
-    def task_ids(self):
-        return list(range(len(self.task_list())))
-    def submit(self, taskid, lang, text):
+                stats['time_usage'] = int(i[1]['time'].split()[0]) / 1000
+            except KeyError: pass
+            if 'memory' in i[1]:
+                m = i[1]['memory']
+                if m.endswith('KB'): m = int(m[:2])*1024
+                elif m.endswith('MB'): m = int(m[:2])*1048576
+                else: assert False
+                stats['memory_usage'] = m
+            ans.append(bjtypes.test_t(outcome, stats))
+        return ans
+    def submit_solution(self, taskid, lang, text):
         tasks, langs, exts, vs = self._cache_call(self.pcms.get_submit)
         task = tasks[taskid]
         lang = [j for i, j, k in self.compiler_list(taskid) if i == lang][0]
@@ -112,19 +125,12 @@ class PCMS(Backend):
         ans = self._cache_call(self.pcms.get_compile_error, task, attempt)
         if ans == None: raise IndexError
         return ans
-    def submission_status(self, subm_id):
-        task, attempt = self._decode_subm_id(subm_id)
-        subms = self._cache_call(self.pcms.get_submissions)
-        for i in subms[task]:
-            if 'attempt' in i[1] and int(i[1]['attempt']) == attempt:
-                return self._remove_tags(i[1]['outcome']) if 'outcome' in i[1] else None
-        return None
     def submission_source(self, subm_id):
         task, attempt = self._decode_subm_id(subm_id)
         return self._cache_call(self.pcms.get_source, task, attempt)
     def compiler_list(self, task_id):
         tasks, langs, jp, vs = self._cache_call(self.pcms.get_submit)
-        return [(i + 1, j, k) for i, (j, k) in enumerate(sorted(langs.items())) if j in jp[tasks[task_id]]]
+        return [bjtypes.compiler_t(i + 1, j, k) for i, (j, k) in enumerate(sorted(langs.items())) if j in jp[tasks[task_id]]]
     def submission_stats(self, subm_id):
         task, attempt = self._decode_subm_id(subm_id)
         ans = {}
@@ -169,20 +175,11 @@ class PCMS(Backend):
     def problem_info(self, task_id):
         html, base = self._cache_call(self.pcms.get_links)
         return ({}, html2md.html2md(html, None, base))
-    def submission_score(self, subm_id):
-        task, attempt = self._decode_subm_id(subm_id)
-        subms = self._cache_call(self.pcms.get_submissions)
-        score = None
-        for i in subms[task]:
-            if 'attempt' in i[1] and int(i[1]['attempt']) == attempt:
-                if 'score' in i[1]:
-                    score = int(i[1]['score'].split(' = ', 1)[1])
-        return score
     def _get_clars(self):
         tasks, clars, vs = self._cache_call(self.pcms.get_clars)
         self._clars = list(clars)
         return tasks, clars, vs
-    def clars(self):
+    def clar_list(self):
         self._get_clars()
         self._messages = [j for i, j in self._cache_call(self.pcms.get_messages) if i == 'msg']
         data = [(i * 2, j[1]['text'].split('.', 1)[0]+': '+j[1]['text pre'].replace('\r', '').replace('\n', ' ')+': '+j[1]['type']) for i, j in enumerate(reversed(self._clars))]
@@ -191,7 +188,7 @@ class PCMS(Backend):
             if x[0] not in self._user_clars_set:
                 self._user_clars_set.add(x[0])
                 self._user_clars.append(x)
-        return [i[0] for i in reversed(self._user_clars)], [i[1] for i in reversed(self._user_clars)]
+        return [bjtypes.clar_t(i[0], i[1]) for i in reversed(self._user_clars)]
     def submit_clar(self, task, subject, text):
         tasks, clars, vs = self._get_clars()
         #clars = list: type, text, 'text pre', type, 'answer pre'

@@ -62,38 +62,34 @@ class EJFuse(Ejudge):
         self.urls = get_urls(base_url+'/new-client?SID='+self.cookies[0])
         self.cookie = 'EJSID='+self.cookies[1]
         self._get_cache = {}
-    def _task_list_ids(self):
+    def tasks(self):
         code, headers, data = self._cache_get(self.url+'?SID=%s&EJSID=%s&action=contest-status-json&json=1'%self.cookies, False)
         data = mbjson(data)
         if code != 200 or not data or not data['ok']:
             raise BruteError("Failed to fetch task list.")
-        return [i['short_name'] for i in data['result']['problems']], [i['id'] for i in data['result']['problems']]
-    def task_list(self):
-        return self._task_list_ids()[0]
+        return [bjtypes.task_t(i, i['short_name'], i['name']) for i in data['result']['problems']]
     def _submission_list(self):
         code, headers, data = self._cache_get(self.url+'?SID=%s&EJSID=%s&action=list-runs-json&prob_id=0&json=1'%self.cookies, False)
         data = mbjson(data)
         if code != 200 or not data or not data['ok']:
             raise BruteError("Failed to fetch submission list.")
         return data['result']['runs']
-    def submission_list(self):
+    def submissions(self):
         data = self._submission_list()
-        tl, ti = self._task_list_ids()
+        tl, ti = list(zip(*self.tasks()))
         ti = {j:i for i, j in enumerate(ti)}
-        return [i['run_id'] for i in data], [tl[ti[i['prob_id']]] for i in data]
+        return [bjtypes.submission_t(i['run_id'], tl[ti[i['prob_id']]], STATUS_NAMES[i['status']], i.get('score', None), None) for i in data]
     def _submission_descr(self, run_id):
         code, headers, data = self._cache_get(self.url+'?SID=%s&EJSID=%s&action=run-status-json&run_id=%%d&json=1'%self.cookies%int(run_id), False)
         data = mbjson(data)
         if code != 200 or not data or not data['ok']:
             raise BruteError("Failed to fetch testing protocol.")
         return data['result']
-    def submission_results(self, run_id):
+    def submission_protocol(self, run_id):
         data = self._submission_descr(run_id)
         try: data = data['testing_report']['tests']
         except KeyError: return [], []
-        return [STATUS_NAMES[i['status']] for i in data], ['%0.3f'%(i['time_ms'] / 1000) for i in data]
-    def task_ids(self):
-        return self._task_list_ids()[1]
+        return [bjtypes.test_t(STATUS_NAMES[i['status']], {'time_usage': i['time_ms'] / 1000}) for i in data]
 #   def submit(self, task, lang, text):
 #       if isinstance(text, str): text = text.encode('utf-8')
 #       try: task = self.task_ids()[task]#task += 1

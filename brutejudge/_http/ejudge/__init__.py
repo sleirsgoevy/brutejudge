@@ -1,5 +1,5 @@
 import ssl, socket, html, collections, urllib.parse, time, math
-import brutejudge._http.ejudge.ej371, brutejudge._http.ejudge.ej373, brutejudge._http.html2md as html2md
+import brutejudge._http.ejudge.ej371, brutejudge._http.ejudge.ej373, brutejudge._http.html2md as html2md, brutejudge._http.types as bjtypes
 from brutejudge._http.base import Backend
 from brutejudge.error import BruteError
 
@@ -138,13 +138,11 @@ class Ejudge(Backend):
         with self.cache_lock:
             if self.caching: self._get_cache[url] = ans
         return ans
-    def task_list(self):
-        code, headers, data = self._cache_get(self.urls['summary'])
-        if code != 200:
-            raise BruteError("Failed to fetch task list.")
-        column_count = data.count(b'<th ')
+    @staticmethod
+    def _task_list(data):
+        column_count = data.count('<th ')
         if column_count == 0: return []
-        splitted = data.decode('utf-8').split('<td class="b1">')[1:]
+        splitted = data.split('<td class="b1">')[1:]
         data = []
         for x in splitted[::column_count]:
             x = x.split("</td>")[0]
@@ -152,30 +150,8 @@ class Ejudge(Backend):
                 x = x.split('"', 2)[2].split('>', 1)[1][:-4]
             data.append(html.unescape(x))
         return data
-    def submission_list(self):
-        code, headers, data = self._cache_get(self.urls['submissions'])
-        if code != 200:
-            raise BruteError("Failed to fetch submission list.")
-        ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8').split('<th class="b1">')[1:]]
-        w = len(ths)
-        if w == 0: return [], []
-        splitted = data.decode('utf-8').split('<td class="b1">')[1:]
-        data = [x.split("</td>")[0] for x in splitted]
-        return list(map(lambda x:(int(x[:-1]) if x[-1:] == '#' else int(x)), data[ths.index('Run ID')::w])), data[ths.index('Problem')::w]
-    def submission_results(self, id):
-        code, headers, data = self._cache_get(self.urls['protocol'].format(run_id=id))
-        if code != 200:
-            raise BruteError("Failed to fetch testing protocol.")
-        w = data.count(b'<th ')
-        if w == 0: return [], []
-        splitted = data.decode('utf-8').split('<td class="b1">')[1:]
-        data = [x.split("</td>")[0] for x in splitted]
-        return [i[:-7].split('>')[-1] for i in data[1::w]], list(map(html.unescape, data[2::w]))
-    def task_ids(self):
-        code, headers, data = self._cache_get(self.urls['summary'])
-        if code != 200:
-            raise BruteError("Failed to fetch task list.")
-        data = data.decode('utf-8')
+    @staticmethod
+    def _task_ids(data):
         try:
             data = data.split('<tr id="probNavTopList"><td width="100%" class="nTopNavList"><ul class="nTopNavList"><li class="first-rad">', 1)[1].split('\n', 1)[0]
         except IndexError:
@@ -188,10 +164,72 @@ class Ejudge(Backend):
         for i in data:
             ans.append(int(i.split('prob_id=', 1)[1]))
         return ans
-    def submit(self, task, lang, text):
+    def tasks(self):
+        code, headers, data = self._cache_get(self.urls['summary'])
+        if code != 200:
+            raise BruteError("Failed to fetch task list.")
+        data = data.decode('utf-8')
+        tl = self._task_list(data)
+        ti = self._task_ids(data)
+        if len(tl) < len(ti): tl.extend([None]*(len(ti)-len(tl)))
+        else: ti.extend([None]*(len(tl)-len(ti)))
+        return [bjtypes.task_t(i, j, None) for i, j in zip(ti, tl)]
+    def submissions(self):
+        code, headers, data = self._cache_get(self.urls['submissions'])
+        if code != 200:
+            raise BruteError("Failed to fetch submission list.")
+        ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8').split('<th class="b1">')[1:]]
+        w = len(ths)
+        if w == 0: return []
+        splitted = data.decode('utf-8').split('<td class="b1">')[1:]
+        data = [x.split("</td>")[0] for x in splitted]
+        run_ids = list(map(lambda x:(int(x[:-1]) if x[-1:] == '#' else int(x)), data[ths.index('Run ID')::w]))
+        task_ids = data[ths.index('Problem')::w]
+        if 'Result' in ths:
+            statuses = data[ths.index('Result')::w]
+        else:
+            statuses = [None]*len(run_ids)
+        if 'Score' in ths:
+            scores = []
+            for i in data[ths.index('Score')::w]:
+                i = i.strip()
+                if i.startswith('<b>'): i = i[3:]
+                if i.endswith('</b>'): i = i[:-4]
+                i = i.strip()
+                if i in ('', 'N/A', '&nbsp;'): scores.append(None)
+                else: scores.append(int(i))
+        else:
+            scores = [None]*len(run_ids)
+        if 'Tests passed' in ths:
+            oktests = []
+            for i in data[ths.index('Tests passed')::w]:
+                i = i.strip()
+                if i.startswith('<b>'): i = i[3:]
+                if i.endswith('</b>'): i = i[:-4]
+                i = i.strip()
+                if i in ('', 'N/A', '&nbsp;'): oktests.append(None)
+                else: oktests.append(int(i))
+        else:
+            oktests = [None]*len(run_ids)
+        assert len(run_ids) == len(task_ids) == len(statuses) == len(scores) == len(oktests)
+        return [bjtypes.submission_t(i, j, k, l, m) for i, j, k, l, m in zip(run_ids, task_ids, statuses, scores, oktests)]
+    def submission_protocol(self, id):
+        code, headers, data = self._cache_get(self.urls['protocol'].format(run_id=id))
+        if code != 200:
+            raise BruteError("Failed to fetch testing protocol.")
+        w = data.count(b'<th ')
+        if w == 0: return []
+        splitted = data.decode('utf-8').split('<td class="b1">')[1:]
+        data = [x.split("</td>")[0] for x in splitted]
+        statuses = [i[:-7].split('>')[-1] for i in data[1::w]]
+        tls = []
+        for i in map(html.unescape, data[2::w]):
+            if i.startswith('>'): i = i[1:]
+            tls.append(float(i))
+        assert len(statuses) == len(tls)
+        return [bjtypes.test_t(i, {'time_usage': j}) for i, j in enumerate(statuses, tls)]
+    def submit_solution(self, task, lang, text):
         if isinstance(text, str): text = text.encode('utf-8')
-        try: task = self.task_ids()[task]#task += 1
-        except IndexError: return
         sid = self.urls['sid']
         url = self.urls['submit']
         data = []
@@ -207,11 +245,9 @@ class Ejudge(Backend):
             for i in data:
                 if x in i: break
             else: break
-    #   x = '-----------------------------850577185583170701784494929'
         data = b'\r\n'.join(b'--'+x+b'\r\nContent-Disposition: form-data; name='+i for i in data)+b'\r\n--'+x+b'--\r\n'
         ans = post(url, data, {'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii'), 'Cookie': self.cookie})
         with self.cache_lock: self.stop_caching()
-        return ans
     def status(self):
         code, headers, data = self._cache_get(self.urls['summary'])
         if code != 200:
@@ -246,29 +282,15 @@ class Ejudge(Backend):
             import html
             ans.append(html.unescape(i))
         return '\n'.join(ans)
-    def _submission_field(self, id, field):
-        code, headers, data = self._cache_get(self.urls['submissions'])
-        if code != 200:
-            raise BruteError("Failed to fetch submission list.")
-        ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8').split('<th class="b1">')[1:]]
-        w = len(ths)
-        if w == 0: return [], []
-        splitted = data.decode('utf-8').split('<td class="b1">')[1:]
-        data = [x.split("</td>")[0] for x in splitted]
-        if field not in ths: return None
-        for i, j in zip(map(lambda x:(int(x[:-1]) if x[-1:] == '#' else int(x)), data[ths.index('Run ID')::w]), data[ths.index(field)::w]):
-            if i == id: return j
-    def submission_status(self, id):
-        return self._submission_field(id, 'Result')
     def submission_source(self, id):
         code, headers, data = self._cache_get(self.urls['source'].format(run_id=id))
         rhd = dict(headers)
         if code != 200 or 'html' in rhd['Content-Type']:
             return None
         return data
-    def do_action(self, name, need_code, fail_pattern=None):
+    def do_action(self, name, *args):
         code, headers, data = get(self.urls[name], {'Cookie': self.cookie})
-        return code == need_code and (fail_pattern == None or fail_pattern not in data)
+        return code == 302
     def compiler_list(self, prob_id):
         code, headers, data = self._cache_get(self.urls['submission'].format(prob_id=prob_id))
         data = data.decode('utf-8')
@@ -277,7 +299,7 @@ class Ejudge(Backend):
             num_id = int(data.split('"', 1)[0])
             lit_id = html.unescape(data.split('</td><td class="b0">', 1)[1].split('</td>', 1)[0])
             short, long = lit_id.strip().split(' - ')
-            return [(num_id, short, long)]
+            return [bjtypes.compiler_t(num_id, short, long)]
         try: data = data.split('<select name="lang_id">', 1)[1].split('</select>', 1)[0]
         except IndexError: raise BruteError("Failed to fetch language list")
         data = data.split('<option ')[1:]
@@ -287,9 +309,9 @@ class Ejudge(Backend):
             b = b.split('>', 1)[1].split('</option>', 1)[0]
             if not a.isnumeric(): continue
             b, c = html.unescape(b).split(' - ')
-            ans.append((int(a), b.strip(), c.strip()))
+            ans.append(bjtypes.compiler_t(int(a), b.strip(), c.strip()))
         return ans
-    def _submission_stats(self, id):
+    def submission_stats(self, id):
         code, headers, data = self._cache_get(self.urls['protocol'].format(run_id=id))
         data = data.decode('utf-8')
         if '<big>' in data:
@@ -308,15 +330,6 @@ class Ejudge(Backend):
             return (ans, data)
         else:
             return ({}, None)
-    def submission_stats(self, id):
-        ans1, ans2 = self._submission_stats(id)
-        tp = self._submission_field(id, 'Tests passed')
-        if tp != None and not (tp+' ').isspace() and tp.strip() != '&nbsp;': tp = int(tp)
-        else: tp = None
-        if tp != None:
-            if 'tests' not in ans1: ans1['tests'] = {}
-            ans1['tests']['success'] = tp
-        return (ans1, ans2)
     def contest_info(self):
         code, headers, data = self._cache_get(self.urls['contest_info'])
         data = data.decode('utf-8')
@@ -365,19 +378,13 @@ class Ejudge(Backend):
         elif code != 200:
             raise BruteError("Error downloading.")
         return data
-    def submission_score(self, id):
-        j = self._submission_field(id, 'Score')
-        if j == None: return None
-        if j.startswith('<b>') and j.endswith('</b>'): j = j[3:-4]
-        if (j+' ').isspace() or j == 'N/A': return None
-        return int(j)
-    def clars(self):
+    def clar_list(self):
         code, headers, data = self._cache_get(self.urls['clars'])
         ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8').split('<th class="b1">')[1:]]
         w = len(ths)
         splitted = data.decode('utf-8').split('<td class="b1">')[1:]
         data = [x.split("</td>")[0] for x in splitted]
-        return list(map(int, data[ths.index('Clar ID')::w])), list(map(html.unescape, data[ths.index('Subject')::w]))
+        return [bjtypes.clar_t(i, j) for i, j in zip(map(int, data[ths.index('Clar ID')::w]), map(html.unescape, data[ths.index('Subject')::w]))]
     def submit_clar(self, task, subject, text): 
         if post(self.urls['submit'], {'SID': self.urls['sid'], 'prob_id': task, 'subject': subject, 'text': text, 'action_41': 'Send!'}, {'Cookie': self.cookie})[0] != 302:
             raise BruteError("Failed to submit clar")

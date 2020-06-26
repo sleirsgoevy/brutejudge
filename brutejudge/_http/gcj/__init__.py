@@ -1,4 +1,5 @@
 import base64, json, collections
+import brutejudge._http.types as bjtypes
 from .oauth import do_oauth
 from ..base import Backend
 from ..ejudge import get, post
@@ -65,14 +66,21 @@ class GCJ(Backend):
         ans['challenge']['tasks'].sort(key=lambda x: x['title'])
         ans['challenge']['tasks'].sort(key=lambda x: sum(i['value'] for i in x['tests']))
         return ans
-    def task_ids(self):
+    def tasks(self):
         data = self._get_dashboard("Failed to fetch task list.")
-        return [int(i['id'], 16) for i in data['challenge']['tasks']]
-    def task_list(self):
-        return [hex(i)[2:] for i in self.task_ids()]
-    def submission_list(self):
+        return [bjtypes.task_t(i, hex(i)[2:], None) for i in (int(i['id'], 16) for i in data['challenge']['tasks'])]
+    def submissions(self):
         data = self._get_which('attempts', "Failed to fetch submission list.")
-        return [int(i['id'], 16) for i in data['attempts']], [hex(int(i['task_id'], 16))[2:] for i in data['attempts']]
+        ans = []
+        for i in data['attempts']:
+            subm_id = int(i['id'], 16)
+            task_id = hex(int(i['task_id'], 16))[2:]
+            status = self._submission_status(i)
+            score = self._submission_stats(data, i)[0]['score']
+            try: oktests = sum(j['verdict__str'] == 'CORRECT' for j in data['judgement']['results'])
+            except KeyError: oktests = None
+            ans.append(bjtypes.submission_t(subm_id, task_id, status, score, oktests))
+        return ans
     @staticmethod
     def _convert_verdict(s):
         s = s.replace('_', ' ')
@@ -87,23 +95,14 @@ class GCJ(Backend):
             if int(i['id'], 16) == subm_id:
                 return i
         return None
-    def _submission_results(self, subm_id):
+    def submission_protocol(self, subm_id):
         subm = self._submission_descr(subm_id)
-        if subm == None: return None
+        if subm == None: return []
         try: subm = subm['judgement']['results']
-        except KeyError: return 'Pending judgement'
-        return [self._convert_verdict(i['verdict__str']) for i in subm], ['%0.3f'%(i['running_time_nanos']/1000000000) for i in subm]
-    def submission_results(self, subm_id):
-        ans = self._submission_results(subm_id)
-        if not isinstance(ans, tuple): ans = ([], [])
-        return ans
-    def submit(self, task, lang, code):
+        except KeyError: return []
+        return [bjtypes.test_t(self._convert_verdict(i['verdict__str']), {'time_usage': i['running_time_nanos']/1000000000, 'memory_usage': i['running_memory_mbs']*1048576}) for i in subm]
+    def submit_solution(self, task, lang, code):
         if isinstance(code, bytes): code = code.decode('utf-8', 'replace')
-        try: tasks = self._get_dashboard('')
-        except BruteError: return
-        else:
-            try: task = tasks['challenge']['tasks'][task]['id']
-            except IndexError: return
         self._json_req('https://codejam.googleapis.com/dashboard/%s/submit'%self.round, {'code': code, 'language_id': lang, 'task_id': task}, do_post=True)
         with self.cache_lock: self.stop_caching()
     def status(self):
@@ -137,10 +136,9 @@ class GCJ(Backend):
         if data == None: return None
         try: return data['judgement']['compilation_output']
         except KeyError: return None
-    def submission_status(self, subm_id):
-        a = self._submission_results(subm_id)
-        if not isinstance(a, tuple): return a
-        return a[0][-1]
+    def _submission_status(self, subm):
+        try: return self._convert_verdict(subm['judgement']['results'][-1]['verdict__str'])
+        except KeyError: return 'Pending judgement'
     def submission_source(self, subm_id):
         data = self._submission_descr(subm_id)
         if data == None: return None
@@ -148,12 +146,8 @@ class GCJ(Backend):
     def do_action(self, *args):
         raise BruteError("Actions are not supported on GCJ.")
     def compiler_list(self, task):
-        return [(i['id'], i['id__str'].lower(), i['name']) for i in self._get_dashboard("Failed to fetch compiler list.")['languages']]
-    def submission_stats(self, subm_id):
-        data = self._get_which('attempts')
-        for subm in data['attempts']:
-            if int(subm['id'], 16) == subm_id: break
-        else: return ({}, None)
+        return [bjtypes.compiler_t(i['id'], i['id__str'].lower(), i['name']) for i in self._get_dashboard("Failed to fetch compiler list.")['languages']]
+    def _submission_stats(self, data, subm):
         for task in data['challenge']['tasks']:
             if int(task['id'], 16) == int(subm['task_id'], 16):
                 break
@@ -162,11 +156,16 @@ class GCJ(Backend):
         ans['tests'] = {'total': 0, 'success': 0, 'fail': 0}
         for i, j in zip(subm.get('judgement', {}).get('results', ()), task.get('tests', 0)):
             if i['verdict__str'] == 'CORRECT': ans['score'] += j['value']
-#       for i in subm.get('judgement', {}).get('results', ()):
             if j['value'] != 0:
                 ans['tests']['success' if i['verdict__str'] == 'CORRECT' else 'fail'] += 1
                 ans['tests']['total'] += 1
         return (ans, None)
+    def submission_stats(self, subm_id):
+        data = self._get_which('attempts')
+        for subm in data['attempts']:
+            if int(subm['id'], 16) == subm_id: break
+        else: return ({}, '')
+        return self._submission_stats(data, subm)
     def contest_info(self):
         db = self._get_dashboard("Failed to fetch contest info.")
         data1 = {'contest_start': db['challenge']['start_ms'] / 1000, 'contest_end': db['challenge']['end_ms'] / 1000}
@@ -177,11 +176,8 @@ class GCJ(Backend):
         for i in self._get_dashboard("Failed to fetch problem info.")['challenge']['tasks']:
             if int(i['id'], 16) == task:
                 return ({}, html2md(i['statement']))
-    def submission_score(self, subm_id):
-        return self.submission_stats(subm_id)[0].get('score', None)
     def stop_caching(self):
         self._get_cache.clear()
-    def clars(self): return [] #STUB
     def contest_list(self):
         if not isinstance(self, str): return []
         competition = self.rsplit('/', 1)[-1]
