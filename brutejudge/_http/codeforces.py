@@ -3,6 +3,7 @@ from brutejudge._http.base import Backend
 from brutejudge.error import BruteError
 from brutejudge._http.openerwr import OpenerWrapper
 import brutejudge._http.html2md as html2md
+import brutejudge._http.types as bjtypes
 
 class CodeForces(Backend):
     @staticmethod
@@ -47,7 +48,7 @@ class CodeForces(Backend):
         short_codes = {43: 'gcc', 42: 'g++11', 50: 'g++14', 54: 'g++', 2: 'msvc2010', 59: 'msvc2017', 9: 'mcs', 7: 'python', 31: 'python3', 40: 'pypy', 41: 'pypy3'}
         langs_ans = []
         for i, j in langs:
-            langs_ans.append((i, short_codes.get(i, str(i)), j))
+            langs_ans.append(bjtypes.compiler_t(i, short_codes.get(i, str(i)), j))
         return (tasks, langs_ans, csrf)
     def _get_submissions(self):
         with self.cache_lock:
@@ -83,7 +84,7 @@ class CodeForces(Backend):
         ans = json.loads(req.read().decode('utf-8', 'replace'))
         if self.caching: self._subms_cache[idx] = ans
         return ans
-    def task_list(self):
+    def tasks(self):
         q = self._get_submit()[0]
         if not q:
             data = self.opener.open(self.base_url).read().decode('utf-8')
@@ -93,11 +94,17 @@ class CodeForces(Backend):
                 return ans
             for i in sp[1:]:
                 ans.append(i.split('"', 1)[0])
-            return ans[::2]
-        return q
-    def submission_list(self):
+            return [bjtypes.task_t(i, j, None) for i, j in enumerate(ans[::2])]
+        return [bjtypes.task_t(i, j, None) for i, j in enumerate(ans[::2])]
+    def submissions(self):
         data = self._get_submissions()[0]
-        return [i[0] for i in data], [i[1]['status-small'].split('<a href="', 1)[1].split('"', 1)[0].rsplit('/', 1)[1] for i in data]
+        return [bjtypes.submission_t(
+            i[0],
+            i[1]['status-small'].split('<a href="', 1)[1].split('"', 1)[0].rsplit('/', 1)[1],
+            self._format_total_status(j['status-cell status-small status-verdict-cell'].split('>', 1)[-1]),
+            None,
+            self._get_oktests(j['status-cell status-small status-verdict-cell'].split('>', 1)[-1])
+        ) for i in data]
     @staticmethod
     def _format_status(st):
         if st == 'OK': return 'OK'
@@ -111,18 +118,28 @@ class CodeForces(Backend):
         v = v.split(' on pretest ', 1)[0]
         v = v.strip()
         return 'OK' if v == 'Accepted' else v
-    def submission_results(self, subm_id):
+    @staticmethod
+    def _get_oktests(st):
+        v = st.split('<')
+        v = v[0]+''.join(i.split('>', 1)[1] for i in v[1:])
+        v = v.split(' on test ', 1)[1]
+        v = v.split(' on pretest ', 1)[1]
+        v = v.strip()
+        try: return int(v) - 1
+        except ValueError: return None
+    def submission_protocol(self, subm_id):
         data = self._get_submission(subm_id, self._get_submissions()[1])
         ntests = int(data.get('testCount', 0))
         ans = []
         for i in range(ntests):
-            try: tc = '%.03f' % (int(float(data['timeConsumed#'+str(i+1)]))/1000)
-            except KeyError: tc = ''
-            try: ans.append((self._format_status(data['verdict#'+str(i+1)]), tc))
+            stats = {}
+            try: stats['time_usage'] = float(data['timeConsumed#'+str(i+1)])/1000
             except KeyError: pass
-        return [i[0] for i in ans], [i[1] for i in ans]
-    def task_ids(self):
-        return list(range(len(self.task_list())))
+            try: stats['memory_usage'] = int(data['memoryConsumed#'+str(i+1)])
+            except KeyError: pass
+            try: ans.append(bjtypes.test_t(self._format_status(data['verdict#'+str(i+1)]), stats))
+            except KeyError: pass
+        return ans
     def _submit(self, task, lang, text, csrf):
         if isinstance(text, str): text = text.encode('utf-8')
         data = []
@@ -145,13 +162,13 @@ class CodeForces(Backend):
                                 headers={'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii')},
                                 method='POST'))
         except urllib.request.URLError: pass
-    def submit(self, task, lang, text):
+    def submit_solution(self, task, lang, text):
         tasks, langs, csrf = self._get_submit()
-        self._submit(tasks[task], lang, text, csrf)
+        self._submit(task, lang, text, csrf)
         with self.cache_lock: self.stop_caching()
     def status(self):
         subms = self._get_submissions()[0]
-        ans = {i: None for i in self.task_list()}
+        ans = {i: None for i, j in self.tasks()}
         for i, j in subms:
             task = j['status-small'].split('<a href="', 1)[1].split('"', 1)[0].rsplit('/', 1)[1]
             status = self._format_total_status(j['status-cell status-small status-verdict-cell'].split('>', 1)[-1])
@@ -197,12 +214,6 @@ class CodeForces(Backend):
             }).encode('ascii')).read().decode('utf-8', 'replace'))
     def compile_error(self, subm_id):
         return self._compile_error(subm_id, self._get_submissions()[1])
-    def submission_status(self, subm_id):
-#       subm = self._get_submission(subm_id, self._get_submissions()[1])
-#       return self._format_total_status(subm.get('verdict', ''))
-        for i, j in self._get_submissions()[0]:
-            if i == subm_id:
-                return self._format_total_status(j['status-cell status-small status-verdict-cell'].split('>', 1)[-1])
     def submission_source(self, subm_id):
         subm = self._get_submission(subm_id, self._get_submissions()[1])
         if 'source' in subm: return subm['source'].encode('utf-8')
@@ -222,20 +233,14 @@ class CodeForces(Backend):
             ans['fail'] = ntests - success
         return (ans, None)
     def problem_info(self, prob_id):
-        task = self.task_list()[prob_id]
+        task = self.tasks()[prob_id][1]
         data = self.opener.open(self.base_url+'/problem/'+task).read().decode('utf-8', 'replace')
         data = data.split('<div class="property-title">', 1)[1].split('</div><div>', 1)[1]
         data = data.split('<script type="text/javascript">', 1)[0]
         return ({}, html2md.html2md(data, None, self.base_url+'/problems/'+task))
     def download_file(self, *args):
         raise BruteError("File download doesn't exist on CodeForces")
-    def submission_score(self, subm_id):
-        scores = self.scores()
-        subms = list(zip(*self.submission_list()))
-        st = self.submission_status(subm_id)
-        if st == 'OK':
-            return scores[[i[1] for i in subms if i[0] == subm_id][0]]
-    def clars(self):
+    def clar_list(self):
         raise BruteError("Clarifications don't exits on CodeForces")
     def submit_clar(self, *args):
         raise BruteError("Clarifications don't exits on CodeForces")

@@ -4,6 +4,7 @@ from .base import Backend
 from .openerwr import OpenerWrapper
 from ..error import BruteError
 import brutejudge._http.html2md as html2md
+import brutejudge._http.types as bjtypes
 
 SUBM_LIST_URL = "/py/problem/0/filter-runs?problem_id=0&from_timestamp=-1&to_timestamp=-1&group_id=0&user_id=%s&lang_id=-1&status_id=-1&statement_id=&count=%d&with_comment=&page=%d"
 
@@ -79,13 +80,13 @@ class Informatics(Ejudge):
                     tasks.append(cur_task)
         else:
             tasks = [int(query['chapterid'])]
-        self.tasks = tasks
+        self.task_list = tasks
         self.subm_list = []
         self.subm_list_partial = []
         self.subm_set = {}
         self._cache = {}
         self.registered = True
-        self.submission_list()
+        self.submissions()
     def _cache_get(self, url):
         with self.cache_lock:
             if url in self._cache: return self._cache[url]
@@ -95,11 +96,11 @@ class Informatics(Ejudge):
         return ans
     def _request_json(self, url):
         return json.loads(self._cache_get(url).decode('utf-8', 'replace'))
-    def task_list(self):
+    def tasks(self):
         if not self.registered: return []
-        return list(map(str, self.tasks))
-    def submission_list(self):
-        if not self.registered: return [], []
+        return [bjtypes.task_t(i, str(i), None) for i in self.task_list]
+    def submissions(self):
+        if not self.registered: return []
         subms = []
         subms_partial = []
         page_cnt = self._request_json(SUBM_LIST_URL%(self.user_id, 100, 1))['metadata']['page_count']
@@ -111,21 +112,23 @@ class Informatics(Ejudge):
                 task_id = i['problem']['id']
                 si = i['id']
                 if si in self.subm_set: break
-                subms.append([si, task_id])
-                if int(task_id) in self.tasks: subms_partial.append([si, task_id])
+                status = self._submission_status(i)
+                score = self._submission_score(i)
+                oktests = i.get('ejudge_test_num', None)
+                subms.append([si, task_id, status, score, oktests])
+                if int(task_id) in self.task_list: subms_partial.append([si, task_id, status, score, oktests])
             else: continue
             break
         idx = -len(self.subm_list)-len(subms)
-        for a, b in subms:
+        for a, b, c, d, e in subms:
             self.subm_set[a] = idx
             idx += 1
         self.subm_list[:0] = subms
         self.subm_list_partial[:0] = subms_partial
-        return ([i[0] for i in self.subm_list_partial], [str(i[1]) for i in self.subm_list_partial])
-    def submission_results(self, id):
+        return [bjtypes.submission_t(i, j, k[0], l, m) for i, j, k, l, m in self.subm_list_partial]
+    def submission_protocol(self, id):
         data = self._request_json("/py/protocol/get/%d"%int(id)).get('tests', {})
-        ans1 = []
-        ans2 = []
+        ans = []
         status_codes = dict(
             OK='OK',
             RT='Run-time error',
@@ -139,18 +142,10 @@ class Informatics(Ejudge):
             WT='Wall time limit exceeded',
             SK='Skipped'
         )
-        for k in sorted(map(int, data)):
-            ans1.append(status_codes[data[str(k)]['status']])
-            ans2.append('%.3f'%(data[str(k)]['time']/1000))
-        return ans1, ans2
-    def task_ids(self):
-        if not self.registered: return []
-        return list(self.tasks)
-    def submit(self, task, lang, text):
+        return [bjtypes.test_t(status_codes[data[str(k)]['status']], {'time_usage': data[str(k)]['time']/1000, 'memory_usage': data[str(k)]['max_memory_used']}) for k in sorted(map(int, data))]
+    def submit_solution(self, task, lang, text):
         if not self.registered: return
         if isinstance(text, str): text = text.encode('utf-8')
-        try: task = self.task_ids()[task]#task += 1
-        except IndexError: return
         data = []
         data.append(b'"lang_id"\r\n\r\n'+str(lang).encode('ascii'))
         data.append(b'"file"; filename="brute.txt"\r\nContent-Type'
@@ -170,8 +165,7 @@ class Informatics(Ejudge):
         if not self.registered: return {}
         self.submission_list()
         by_task = {}
-        for a, b in self.subm_list_partial:
-            c = self._submission_status(a)
+        for a, b, c, d, e in self.subm_list_partial:
             if b not in by_task or by_task[b][1] < c[1]:
                 by_task[b] = c
         return collections.OrderedDict((i, by_task.get(i, (None,))[0]) for i in self.task_list())
@@ -179,23 +173,14 @@ class Informatics(Ejudge):
         if not self.registered: return {}
         self.submission_list()
         by_task = {}
-        for a, b in self.subm_list_partial:
-            d = self.submission_score(a)
+        for a, b, c, d, e in self.subm_list_partial:
             if d != None and (b not in by_task or by_task[b] < d):
                 by_task[b] = d
         return collections.OrderedDict((i, by_task.get(i, None)) for i in self.task_list())
     def compile_error(self, id):
         data = self._request_json("/py/protocol/get/%d"%int(id))
         return data.get('compiler_output', data.get('protocol', '')) or None
-    def _submission_object(self, id):
-        id = int(id)
-        if id not in self.subm_set: return None
-        match = len(self.subm_list) + self.subm_set[id]
-#       print(id, self.subm_list[match])
-        ans = self._request_json(SUBM_LIST_URL%(self.user_id, 100, match // 100 + 1))['data'][match % 100]
-#       print('submission_object', id, '=', ans)
-        return ans
-    def _submission_status(self, id):
+    def _submission_status(self, obj):
         statuses = {
             0: ('OK', 2),
             98: ('Compiling...', -1),
@@ -203,10 +188,8 @@ class Informatics(Ejudge):
             1: ('Compilation error', 0),
             7: ('Partial solution', 1)
         }
-        status = self._submission_object(id)['ejudge_status']
+        status = obj['ejudge_status']
         return statuses.get(status, ('Unknown status #%d'%status, 0))
-    def submission_status(self, id):
-        return self._submission_status(id)[0]
     def submission_source(self, id):
         data = self._request_json("/py/problem/run/%d/source"%int(id))
         return data.get('data', {}).get('source', None).encode('utf-8')
@@ -229,22 +212,21 @@ class Informatics(Ejudge):
             a = int(i.split("'", 1)[0].split('"', 1)[0])
             c = html.unescape(i.split('</option>', 1)[0].split('>', 1)[1])
             b = known_compilers.get(a, str(a))
-            ans.append((a, b, c.strip()))
+            ans.append(bjtypes.compiler_t(a, b, c.strip()))
         return ans
     def submission_stats(self, id):
         data = self._request_json("/py/protocol/get/%d"%int(id))
         ans = {}
-        score = self.submission_score(id)
-        if score != None:
-            ans['score'] = score
+        score = [i[3] for i in self.subm_list_partial if i[0] == id]
+        if len(score) == 1 and score[0] != None:
+            ans['score'] = score[0]
         if 'tests' in data:
             ans['tests'] = {}
             ans['tests']['total'] = len(data['tests'])
             ans['tests']['success'] = sum(1 for k, v in data['tests'].items() if v['status'] == 'OK')
             ans['tests']['fail'] = ans['tests']['total'] - ans['tests']['success']
         return (ans, None)
-    def submission_score(self, id):
-        data = self._submission_object(id)
+    def _submission_score(self, data):
         return data['ejudge_score'] if data['ejudge_score'] >= 0 else None
     def contest_info(self):
         return ('', {}, {})
@@ -260,7 +242,7 @@ class Informatics(Ejudge):
         return ({}, html2md.html2md(the_html.split("<div id='submit' ", 1)[0], None, "https://informatics.msk.ru"+url))
     def download_file(self, prob_id, filename):
         raise BruteError("File download doesn't exist on informatics.msk.ru")
-    def clars(self):
+    def clar_list(self):
         raise BruteError("Clarifications don't exits on informatics.msk.ru")
     def submit_clar(self, *args):
         raise BruteError("Clarifications don't exits on informatics.msk.ru")
@@ -271,4 +253,4 @@ class Informatics(Ejudge):
     def scoreboard(self):
         raise BruteError("Scoreboard is not supported on informatics.msk.ru")
     def stop_caching(self):
-        self._cache.clear()    
+        self._cache.clear()

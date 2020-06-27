@@ -37,31 +37,30 @@ Then type `brutejudge` into the prompt.
 (Note: the following table can be obtained by running `python3 coverage.py`)
 
 ```
-                   AggressiveCacheBackend EJFuse  JJS     Informatics Informatics CodeForces GCJ     PCMS    Ejudge 
-clars              missing                inherit missing stub        stub        stub       stub    OK      OK     
-compile_error      OK                     OK      OK      OK          OK          OK         OK      OK      OK     
-compiler_list      OK                     OK      OK      OK          OK          OK         OK      OK      OK     
-contest_info       missing                OK      OK      OK          OK          missing    OK      OK      OK     
-contest_list       OK                     inherit OK      inherit     inherit     inherit    OK      inherit OK     
-detect             OK                     OK      OK      OK          OK          OK         OK      OK      OK     
-do_action          OK                     inherit missing stub        OK          missing    stub    stub    OK     
-download_file      missing                inherit missing stub        stub        stub       missing stub    OK     
-get_samples        missing                OK      OK      stub        stub        OK         missing missing OK     
-login_type         OK                     inherit OK      inherit     inherit     inherit    OK      inherit inherit
-problem_info       OK                     inherit missing OK          OK          OK         OK      OK      OK     
-read_clar          OK                     inherit missing stub        stub        stub       missing OK      OK     
-scoreboard         missing                inherit OK      stub        stub        OK         missing OK      OK     
-scores             missing                OK      OK      OK          OK          OK         OK      OK      OK     
-status             missing                OK      OK      OK          OK          OK         OK      OK      OK     
-stop_caching       missing                inherit OK      OK          OK          OK         OK      OK      OK     
-submission_list    missing                OK      OK      OK          OK          OK         OK      OK      OK     
-submission_results OK                     OK      OK      OK          OK          OK         OK      OK      OK     
-submission_score   OK                     OK      OK      OK          OK          OK         OK      OK      OK     
-submission_source  OK                     OK      OK      OK          OK          OK         OK      OK      OK     
-submission_stats   OK                     OK      OK      OK          OK          OK         OK      OK      OK     
-submission_status  OK                     OK      OK      OK          OK          OK         OK      OK      OK     
-submit             missing                inherit OK      OK          OK          OK         OK      OK      OK     
-submit_clar        missing                inherit missing stub        stub        stub       missing OK      OK     
-task_ids           OK                     OK      OK      OK          OK          OK         OK      OK      OK     
-task_list          OK                     OK      OK      OK          OK          OK         OK      OK      OK     
+                    AggressiveCacheBackend EJFuse  JJS     Informatics CodeForces GCJ     PCMS    Ejudge 
+clar_list           missing                inherit missing stub        stub       missing OK      OK     
+compile_error       OK                     OK      OK      OK          OK         OK      OK      OK     
+compiler_list       OK                     OK      OK      OK          OK         OK      OK      OK     
+contest_info        missing                OK      OK      OK          missing    OK      OK      OK     
+contest_list        OK                     inherit OK      inherit     inherit    OK      inherit OK     
+detect              OK                     OK      OK      OK          OK         OK      OK      OK     
+do_action           OK                     inherit missing OK          missing    stub    stub    OK     
+download_file       missing                inherit missing stub        stub       missing stub    OK     
+get_samples         missing                OK      OK      stub        OK         missing missing OK     
+login_type          OK                     inherit OK      inherit     inherit    OK      inherit inherit
+problem_info        OK                     inherit missing OK          OK         OK      OK      OK     
+read_clar           OK                     inherit missing stub        stub       missing OK      OK     
+scoreboard          missing                inherit OK      stub        OK         missing OK      OK     
+scores              missing                OK      OK      OK          OK         OK      OK      OK     
+status              missing                OK      OK      OK          OK         OK      OK      OK     
+stop_caching        missing                inherit OK      OK          OK         OK      OK      OK     
+submission_protocol OK                     OK      OK      OK          OK         OK      OK      OK     
+submission_score    missing                OK      missing missing     missing    missing missing missing
+submission_source   OK                     OK      OK      OK          OK         OK      OK      OK     
+submission_stats    OK                     OK      OK      OK          OK         OK      OK      OK     
+submission_status   missing                OK      missing missing     missing    missing missing missing
+submissions         missing                OK      OK      OK          OK         OK      OK      OK     
+submit_clar         missing                inherit missing stub        stub       missing OK      OK     
+submit_solution     missing                inherit OK      OK          OK         OK      OK      OK     
+tasks               OK                     OK      OK      OK          OK         OK      OK      OK     
 ```

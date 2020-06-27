@@ -2,6 +2,7 @@ import json, base64, socket, urllib.parse
 from brutejudge.error import BruteError
 from brutejudge._http.base import Backend
 from brutejudge._http.ejudge import do_http, get, post
+import brutejudge._http.types as bjtypes
 
 def urlescape(s):
     return urllib.parse.urlencode({'x': s})[2:]
@@ -83,25 +84,29 @@ class JJS(Backend):
         return ans
     def stop_caching(self):
         self._get_cache.clear()
-    def task_list(self):
+    def tasks(self):
         code, headers, data = self._cache_get('/contests/'+urlescape(self.contest)+'/problems')
         if code != 200: return []
-        return [i['rel_name'] for i in data]
-    def submission_list(self):
+        return [bjtypes.task_t(i, j['rel_name'], j['name']) for i, j in enumerate(data)]
+    def submissions(self):
         code, headers, data = self._cache_get('/contests/'+urlescape(self.contest)+'/problems')
         if code != 200: mapping = {}
         else: mapping = {i['name']: i['rel_name'] for i in data}
         code, headers, data = self._cache_get('/runs')
-        if code != 200: return [], []
+        if code != 200: return []
         data.reverse()
-        return [i['id'] for i in data if i['contest_id'] == self.contest], [mapping.get(i['problem_name'], i['problem_name']) for i in data if i['contest_id'] == self.contest]
-    def submission_results(self, id):
+        return [bjtypes.submission_t(
+            i['id'],
+            mapping.get(i['problem_name'], i['problem_name']),
+            self._submission_status(lsu, i),
+            self._submission_status(lsu, i),
+            lsu['test']
+        ) for i, lsu in ((i, self._get_lsu(i['id'])) for i in data if i['contest_id'] == self.contest)]
+    def submission_protocol(self, id):
         code, headers, data = self._cache_get('/runs/%d/protocol?compile_log=true&resource_usage=true'%int(id))
-        if code != 200: return [], []
-        return [self._format_status(i['status']['code']) for i in data['tests']], ['%0.3f'%((i['time_usage']//1000000)/1000) for i in data['tests']]
-    def task_ids(self):
-        return list(range(len(self.task_list())))
-    def submit(self, taskid, lang, text):
+        if code != 200: return []
+        return [bjtypes.test_t(self._format_status(i['status']['code']), {'time_usage': i['time_usage']/1000000000, 'memory_usage': i['memory_usage']}) for i in data['tests']]
+    def submit_solution(self, taskid, lang, text):
         tl = self.task_list()
         if taskid not in range(len(tl)): return
         cl = self.compiler_list(taskid)
@@ -136,7 +141,7 @@ class JJS(Backend):
     def compiler_list(self, task):
         code, headers, data = self._cache_get('/toolchains')
         if code == 200:
-            return [(i, x['id'], x['name']) for i, x in enumerate(data)]
+            return [bjtypes.compiler_t(i, x['id'], x['name']) for i, x in enumerate(data)]
         else:
             raise BruteError("Failed to fetch compiler list.")
     def _submission_descr(self, id):
@@ -179,13 +184,11 @@ class JJS(Backend):
         code, headers, data = self._cache_get('/system/is-dev')
         if code != 200: return ('', {}, {})
         return ('', {}, {'jjs_devmode': data})
-    def submission_status(self, id):
-        lsu = self._get_lsu(id)
+    def _submission_status(self, lsu, st):
         if lsu != None:
             status = 'Running'
             if lsu['test'] != None: status += ', test '+str(lsu['test'])
             return status
-        st = self._submission_descr(id)
         if st == None: return None
         if st['status'] == None: return 'Running'
         return self._format_status(st['status']['code'])
@@ -208,10 +211,8 @@ class JJS(Backend):
             prot['subtasks'].sort(key=lambda i: i['subtask_id'])
             ans['group_scores'] = [i['score'] for i in prot['subtasks']]
         return (ans, '')
-    def submission_score(self, id):
-        lsu = self._get_lsu(id)
+    def _submission_score(self, lsu, st):
         if lsu != None: return lsu['score']
-        st = self._submission_descr(id)
         if st == None: return None
         return st['score']
     def get_samples(self, id, *, binary=False):
