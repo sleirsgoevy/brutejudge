@@ -26,8 +26,11 @@ class JJS(Backend):
         return len(sp) >= 2 and sp[0] in ('http+jjs:', 'https+jjs:') and not sp[1]
     @staticmethod
     def login_type(url):
-        url, params = url.split('?')
-        params = {k: v for k, v in (i.split('=', 1) if '=' in i else (i, None) for i in params.split('&'))}
+        if '?' in url:
+            url, params = url.split('?')
+            params = {k: v for k, v in (i.split('=', 1) if '=' in i else (i, None) for i in params.split('&'))}
+        else:
+            params = {}
         if 'contest' not in params:
             return ['contest_list']
         elif params.get('auth', None) == 'token':
