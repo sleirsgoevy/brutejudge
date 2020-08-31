@@ -39,6 +39,10 @@ class JJS(Backend):
             return []
         else:
             return ['login', 'pass']
+    @staticmethod
+    def _get_uuid(subm_id):
+        uu = '%032x'%subm_id
+        return uu[:8]+'-'+uu[8:12]+'-'+uu[12:16]+'-'+uu[16:20]+'-'+uu[20:32]
     def __init__(self, url, login, password):
         Backend.__init__(self)
         url, params = url.split('?')
@@ -47,7 +51,7 @@ class JJS(Backend):
         params = {k: v for k, v in (i.split('=', 1) if '=' in i else (i, None) for i in params.split('&'))}
         contest_id = params['contest']
         if params.get('auth', None) == 'token':
-            self.cookie = 'Token '+password
+            self.cookie = 'Bearer '+password
         elif params.get('auth', None) == 'gettoken':
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.connect('/tmp/jjs-auth-sock')
@@ -59,16 +63,16 @@ class JJS(Backend):
             token = token.decode('ascii').strip()
             if not (token.startswith('===') and token.endswith('===')):
                 raise BruteError('Login failed: failed to get token from jjs-auth-sock')
-            self.cookie = 'Token '+token[3:-3]
+            self.cookie = 'Bearer '+token[3:-3]
         elif params.get('auth', None) == 'guest':
-            self.cookie = 'Token Guest'
+            self.cookie = 'Bearer Guest'
         else:
             code, headers, data = json_req(url + '/auth/simple', {'login': login, 'password': password})
             if code != 200:
-                try: msg = 'Login failed: %s'%data['detail']['errorCode']
+                try: msg = 'Login failed: %s'%data['detail']
                 except Exception: msg = 'Login failed.'
                 raise BruteError(msg)
-            self.cookie = 'Token '+data['data']
+            self.cookie = 'Bearer '+data['data']
         self.url = url
         self.params = params
         self.contest = contest_id
@@ -99,21 +103,21 @@ class JJS(Backend):
         if code != 200: return []
         data.reverse()
         return [bjtypes.submission_t(
-            i['id'],
+            int(i['id'].replace('-', ''), 16),
             mapping.get(i['problem_name'], i['problem_name']),
             self._submission_status(lsu, i),
             self._submission_status(lsu, i),
-            lsu['test']
-        ) for i, lsu in ((i, self._get_lsu(i['id'])) for i in data if i['contest_id'] == self.contest)]
+            lsu.get('test', None) if lsu != None else None
+        ) for i, lsu in ((i, self._get_lsu(i['id'])) for i in data if i['contest_name'] == self.contest)]
     def submission_protocol(self, id):
-        code, headers, data = self._cache_get('/runs/%d/protocol?compile_log=true&resource_usage=true'%int(id))
+        code, headers, data = self._cache_get('/runs/%s/protocol?compile_log=true&resource_usage=true'%self._get_uuid(int(id)))
         if code != 200: return []
         return [bjtypes.test_t(self._format_status(i['status']['code']), {'time_usage': i['time_usage']/1000000000, 'memory_usage': i['memory_usage']}) for i in data['tests']]
     def submit_solution(self, taskid, lang, text):
-        tl = self.task_list()
+        tl = self.tasks()
         if taskid not in range(len(tl)): return
         cl = self.compiler_list(taskid)
-        taskid = tl[taskid]
+        taskid = tl[taskid][1]
         if lang not in range(len(cl)): return
         lang = cl[lang][1]
         if isinstance(text, str): text = text.encode('utf-8')
@@ -124,7 +128,7 @@ class JJS(Backend):
             'contest': self.contest
         }, {'Authorization': self.cookie})
         if code != 200:
-            try: msg = 'Submit failed: '+data['detail']['errorCode']
+            try: msg = 'Submit failed: '+data['detail']
             except: return
             else: raise BruteError(msg)
         with self.cache_lock: self.stop_caching()
@@ -144,18 +148,19 @@ class JJS(Backend):
     def compiler_list(self, task):
         code, headers, data = self._cache_get('/toolchains')
         if code == 200:
-            return [bjtypes.compiler_t(i, x['id'], x['name']) for i, x in enumerate(data)]
+            return [bjtypes.compiler_t(i, x['id'], x['description']) for i, x in enumerate(data)]
         else:
             raise BruteError("Failed to fetch compiler list.")
     def _submission_descr(self, id):
-        id = int(id)
+        id = self._get_uuid(int(id))
         code, headers, data = self._cache_get('/runs')
         if code != 200: return None
         for i in data:
             if i['id'] == id:
                 return i
     def _get_lsu(self, id):
-        id = int(id)
+        return None
+        id = self._get_uuid(int(id))
         code, headers, lsu = self._cache_get('/runs/%d/live'%id)
         if code != 200:
             return self.lsu_cache.get(id, None)
@@ -173,12 +178,13 @@ class JJS(Backend):
         st = st.replace('_', ' ')
         return st[:1].upper()+st[1:].lower()
     def compile_error(self, id, *, binary=False, kind=None):
+        id = self._get_uuid(int(id))
         if kind in (None, 1): # compiler output
-            code, headers, data = self._cache_get('/runs/%d/protocol?compile_log=true&resource_usage=true')
+            code, headers, data = self._cache_get('/runs/%s/protocol?compile_log=true&resource_usage=true'%id)
             if code != 200: ans = None
             else: ans = base64.b64decode(data.get('compile_stdout', '').encode('ascii'))+base64.b64decode(data.get('compile_stderr', '').encode('ascii'))
         elif kind == 3: # binary
-            code, headers, data = get(self.url+'/runs/%d/binary', {'Authorization': self.cookie})
+            code, headers, data = get(self.url+'/runs/%s/binary'%id, {'Authorization': self.cookie})
             if code != 200: ans = None
             else: ans = data
         if ans != None and not binary: ans = ans.decode('utf-8', 'replace')
@@ -193,10 +199,10 @@ class JJS(Backend):
             if lsu['test'] != None: status += ', test '+str(lsu['test'])
             return status
         if st == None: return None
-        if st['status'] == None: return 'Running'
+        if not st['status']: return 'Running'
         return self._format_status(st['status']['code'])
     def submission_source(self, id):
-        code, headers, data = self._cache_get('/runs/%d/source'%int(id))
+        code, headers, data = self._cache_get('/runs/%s/source'%self._get_uuid(int(id)))
         if code != 200: return None
         return base64.b64decode(data.encode('ascii'))
     def submission_stats(self, id):
@@ -208,7 +214,7 @@ class JJS(Backend):
         st = self._submission_descr(id)
         if st == None: return None
         ans = {}
-        code, headers, prot = self._cache_get('/runs/%d/protocol?compile_log=true&resource_usage=true'%int(id))
+        code, headers, prot = self._cache_get('/runs/%s/protocol?compile_log=true&resource_usage=true'%self._get_uuid(int(id)))
         if code != 200: prot = None
         if 'subtasks' in prot and prot['subtasks']:
             prot['subtasks'].sort(key=lambda i: i['subtask_id'])
@@ -224,7 +230,7 @@ class JJS(Backend):
             if not binary: ans = ans.decode('utf-8', 'replace')
             return ans
         ans = {}
-        code, headers, data = self._cache_get('/runs/%d/protocol?test_data=true&output=true&answer=true'%int(id))
+        code, headers, data = self._cache_get('/runs/%s/protocol?test_data=true&output=true&answer=true'%self._get_uuid(int(id)))
         if code != 200: return ans
         for i, j in enumerate(i for i in data['tests']):
             cur = ans[i + 1] = {}

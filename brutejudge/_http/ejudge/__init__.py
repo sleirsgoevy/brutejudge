@@ -425,10 +425,15 @@ class Ejudge(Backend):
         if code != 200:
             raise BruteError("Failed to fetch scoreboard.")
         teams = data.decode('utf-8').split('<td  class="st_team">')[1:]
-        teams = [html.unescape(x.split("</td>")[0]) for x in teams]
         probs = data.decode('utf-8').split('<td  class="st_prob')[1:]
-        probs = [x.split("</td>")[0] for x in probs]
-        try: ntasks = len(probs) // len(teams)
+        naux = 0
+        if not probs and not teams and b'<table border="1" cellspacing="1" celpadding="3">\n  <tbody><tr>\n    <th align="right">Place</th>' in data:
+            probs = sum((i.split('<td class="st_prob') for i in data.decode('utf-8').split('<td align="center"')), [])[1:]
+            teams = data.decode('utf-8').split('<td align="left">')[1:]
+            naux = 1
+        probs = [x.split("</td>", 1)[0] for x in probs]
+        teams = [html.unescape(x.split("</td>", 1)[0]) for x in teams]
+        try: ntasks = len(probs) // len(teams) - naux
         except ZeroDivisionError: return []
         del teams[-3:]
         del probs[-3*ntasks:]
@@ -451,7 +456,8 @@ class Ejudge(Backend):
                     attempts = float('-inf')
                     ans[-1][1].append({'score': score, 'attempts': attempts})
                 else:
-                    assert False, j
+                    assert False, repr(j)
+            for j in range(naux): next(probs)
         return ans
     def stop_caching(self):
         self._get_cache.clear()
