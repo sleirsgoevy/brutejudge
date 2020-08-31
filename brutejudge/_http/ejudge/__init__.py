@@ -227,7 +227,7 @@ class Ejudge(Backend):
             if i.startswith('>'): i = i[1:]
             tls.append(float(i))
         assert len(statuses) == len(tls)
-        return [bjtypes.test_t(i, {'time_usage': j}) for i, j in enumerate(statuses, tls)]
+        return [bjtypes.test_t(i, {'time_usage': j}) for i, j in zip(statuses, tls)]
     def submit_solution(self, task, lang, text):
         if isinstance(text, str): text = text.encode('utf-8')
         sid = self.urls['sid']
