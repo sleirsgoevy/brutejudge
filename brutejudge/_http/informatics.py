@@ -11,28 +11,22 @@ SUBM_LIST_URL = "/py/problem/0/filter-runs?problem_id=0&from_timestamp=-1&to_tim
 class Informatics(Ejudge):
     @staticmethod
     def detect(url):
-        sp = url.split('/', 3)
-        sp[2] = '.'.join(sp[2].split('.')[-3:])
-        url = '/'.join(sp)
         for proto in ('http', 'https'):
             for domain in ('mccme', 'msk'):
-                if (url+'/').startswith('%s://informatics.%s.ru/'%(proto, domain)):
+                if (url+'/').startswith('%s://old.informatics.%s.ru/'%(proto, domain)):
                     for path in ('cgi-bin', 'ej'):
-                        if (url+'/').startswith('%s://informatics.%s.ru/%s/'%(proto, domain, path)):
+                        if (url+'/').startswith('%s://old.informatics.%s.ru/%s/'%(proto, domain, path)):
                             break
                     else:
                         return True
         return False
     def __init__(self, url, login, password):
         Backend.__init__(self)
-        sp = url.split('/', 3)
-        sp[2] = '.'.join(sp[2].split('.')[-3:])
-        url = '/'.join(sp)
         for proto in ('http', 'https'):
             for domain in ('mccme', 'msk'):
-                if (url+'/').startswith('%s://informatics.%s.ru/'%(proto, domain)):
+                if (url+'/').startswith('%s://old.informatics.%s.ru/'%(proto, domain)):
                     for vt in (('', ''), ('', '3'), ('moodle/', ''), ('moodle/', '3')):
-                        if url.startswith('%s://informatics.%s.ru/%smod/statements/view%s.php?'%((proto, domain)+vt)):
+                        if url.startswith('%s://old.informatics.%s.ru/%smod/statements/view%s.php?'%((proto, domain)+vt)):
                             if not vt[1]:
                                 url = url.replace('view', 'view3', 1)
                             if vt[0]:
@@ -46,16 +40,16 @@ class Informatics(Ejudge):
             else: continue
             break
         else:
-            raise BruteError("Not an informatics.msk.ru URL")
+            raise BruteError("Not an old.informatics.msk.ru URL")
         self.url = url
         self.opener = OpenerWrapper(urllib.request.build_opener(urllib.request.HTTPCookieProcessor))
-        self.opener.open("https://informatics.msk.ru/")
-        req = self.opener.open("https://informatics.msk.ru/login/index.php", urllib.parse.urlencode({
+        self.opener.open("https://old.informatics.msk.ru/")
+        req = self.opener.open("https://old.informatics.msk.ru/login/index.php", urllib.parse.urlencode({
             'username': login,
             'password': password,
             'testcookies': 1
         }).encode('ascii'))
-        if req.geturl() != 'https://informatics.msk.ru/':
+        if req.geturl() != 'https://old.informatics.msk.ru/':
             raise BruteError("Login failed.")
         self.registered = False
         data = self.opener.open(url).read().decode('utf-8', 'replace')
@@ -90,7 +84,7 @@ class Informatics(Ejudge):
     def _cache_get(self, url):
         with self.cache_lock:
             if url in self._cache: return self._cache[url]
-        ans = self.opener.open("https://informatics.msk.ru"+url).read()
+        ans = self.opener.open("https://old.informatics.msk.ru"+url).read()
         with self.cache_lock:
             if self.caching: self._cache[url] = ans
         return ans
@@ -159,7 +153,7 @@ class Informatics(Ejudge):
             else: break
     #   x = '-----------------------------850577185583170701784494929'
         data = b'\r\n'.join(b'--'+x+b'\r\nContent-Disposition: form-data; name='+i for i in data)+b'\r\n--'+x+b'--\r\n'
-        self.opener.open(urllib.request.Request("https://informatics.msk.ru/py/problem/%d/submit"%task, data, {'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii')}))
+        self.opener.open(urllib.request.Request("https://old.informatics.msk.ru/py/problem/%d/submit"%task, data, {'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii')}))
         with self.cache_lock: self.stop_caching()
     def status(self):
         if not self.registered: return {}
@@ -200,7 +194,7 @@ class Informatics(Ejudge):
             query = dict(tuple(i.split('=', 1)) for i in self.url.split('#', 1)[0].split('?', 1)[1].split('&'))
             if 'id' not in query or '<form action="view3.php?id='+query['id']+'&register=1" method="post">' not in data:
                 return False
-            data = self.opener.open('https://informatics.msk.ru/mod/statements/view3.php?id='+query['id']+'&register=1', b'').read().decode('utf-8', 'replace')
+            data = self.opener.open('https://old.informatics.msk.ru/mod/statements/view3.php?id='+query['id']+'&register=1', b'').read().decode('utf-8', 'replace')
             if '<script type="text/javascript">\n//<![CDATA[\n\n  function redirect() {\n      document.location.replace(\'view3.php?id='+query['id']+'\');\n  }\n  setTimeout("redirect()", 3000);\n//]]>\n</script>' not in data: return False
             self._init_full()
         raise BruteError("NYI")
@@ -239,18 +233,18 @@ class Informatics(Ejudge):
             the_html = the_html.split('<h1>', 2)
             the_html = '<h1>'+the_html[0]+the_html[2]
         else: return ({}, None)
-        return ({}, html2md.html2md(the_html.split("<div id='submit' ", 1)[0], None, "https://informatics.msk.ru"+url))
+        return ({}, html2md.html2md(the_html.split("<div id='submit' ", 1)[0], None, "https://old.informatics.msk.ru"+url))
     def download_file(self, prob_id, filename):
-        raise BruteError("File download doesn't exist on informatics.msk.ru")
+        raise BruteError("File download doesn't exist on old.informatics.msk.ru")
     def clar_list(self):
-        raise BruteError("Clarifications don't exits on informatics.msk.ru")
+        raise BruteError("Clarifications don't exits on old.informatics.msk.ru")
     def submit_clar(self, *args):
-        raise BruteError("Clarifications don't exits on informatics.msk.ru")
+        raise BruteError("Clarifications don't exits on old.informatics.msk.ru")
     def read_clar(self, id):
-        raise BruteError("Clarifications don't exits on informatics.msk.ru")
+        raise BruteError("Clarifications don't exits on old.informatics.msk.ru")
     def get_samples(self, subm_id):
-        raise BruteError("Can't get samples on informatics.msk.ru")
+        raise BruteError("Can't get samples on old.informatics.msk.ru")
     def scoreboard(self):
-        raise BruteError("Scoreboard is not supported on informatics.msk.ru")
+        raise BruteError("Scoreboard is not supported on old.informatics.msk.ru")
     def stop_caching(self):
         self._cache.clear()
