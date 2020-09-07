@@ -38,6 +38,7 @@ Then type `brutejudge` into the prompt.
 
 ```
                     AggressiveCacheBackend EJFuse  JJS     Informatics CodeForces GCJ     PCMS    Ejudge 
+change_password     missing                inherit missing inherit     missing    missing missing OK     
 clar_list           missing                inherit missing stub        stub       missing OK      OK     
 compile_error       OK                     OK      OK      OK          OK         OK      OK      OK     
 compiler_list       OK                     OK      OK      OK          OK         OK      OK      OK     

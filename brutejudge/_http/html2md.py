@@ -28,7 +28,7 @@ def html2md(data, dload_prefix=None, base=None):
     hrefs = []
     for i in data[1:]:
         if i.startswith('a href="'):
-            href, i = i[8:][1].split('">', 1)
+            href, i = i[8:].split('">', 1)
             href = do_unescape(href.split('"', 1)[0], is_code)
             if base != None: href = urllib.parse.urljoin(base, href)
             if dload_prefix != None and href.startswith(dload_prefix):
