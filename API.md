@@ -180,6 +180,12 @@ This function returns the rows of the scoreboard table up-to-down. The row forma
 
 The information is provided on a best-effort basis.
 
+### `change_password(url, cookie, oldpass, newpass)`
+
+This function changes the user's login password to `newpass` if the old password is `oldpass`. It is unspecified whether it will be changed if the old password is not `oldpass`, or if password authentication is disabled for the account.
+
+A non-exceptional return from this function means that the password has been successfully changed. After that the `(url, cookie)` pair used for calling the function should be considered invalid; it is not specified whether future calls using it will succeed.
+
 ### `may_cache(url, cookie)`
 
 This function is a context manager. When the context manager for a specific session is active in at least one thread, all data retrieved from the testing system is cached client-side. This is useful for saving bandwidth when several subsequent API calls pull the same data internally. The cache is flushed on any call to `submit` or `submit_clar` or when the last thread exits `may_cache`.
