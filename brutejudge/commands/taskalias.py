@@ -1,17 +1,17 @@
 import collections
 from brutejudge.http import task_list
 from brutejudge.error import BruteError
+import brutejudge._http.types
 
 class TaskAlias:
     def __init__(self, parent):
         self.parent = parent
         self.taskalias_k2v = {}
         self.taskalias_v2k = {}
-    def task_list(self):
-        return [self.taskalias_k2v.get(i, i) for i in self.parent.task_list()]
-    def submission_list(self):
-        a, b = self.parent.submission_list()
-        return a, [self.taskalias_k2v.get(i, i) for i in b]
+    def tasks(self):
+        return [brutejudge._http.types.task_t(i, self.taskalias_k2v.get(j, j), k) for i, j, k in self.parent.tasks()]
+    def submissions(self):
+        return [brutejudge._http.types.submission_t(i, self.taskalias_k2v.get(j, j), *k) for i, j, *k in self.parent.submissions()]
     def status(self):
         return collections.OrderedDict((self.taskalias_k2v.get(k, k), v) for k, v in self.parent.status().items())
     def scores(self):
