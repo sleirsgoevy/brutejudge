@@ -1,4 +1,4 @@
-import sys, threading, io, subprocess
+import sys, threading, io, subprocess, os
 
 class TLDProxy:
      def __init__(self, default):
@@ -28,11 +28,17 @@ class MonkeyPopen(subprocess.Popen):
             if args[5] == subprocess.STDOUT: args[5] = sys.stdout
         super().__init__(*args, **kwds)
 
+def monkey_system(cmd):
+    status = subprocess.call(cmd, shell=True)
+    if status < 0: return -status
+    else: return status * 256
+
 def hook_stdio():
     sys.stdin = io.TextIOWrapper(TLDProxy(sys.stdin.buffer), line_buffering=True)
     sys.stdout = io.TextIOWrapper(TLDProxy(sys.stdout.buffer), line_buffering=True)
     sys.stderr = io.TextIOWrapper(TLDProxy(sys.stderr.buffer), line_buffering=True)
     subprocess.Popen = MonkeyPopen
+    os.system = monkey_system
 
 hook_stdio()
 
@@ -49,9 +55,11 @@ class RedirectSTDIO:
         sys.stdout.buffer._tld.value = self.new_stdout
         sys.stderr.buffer._tld.value = self.new_stderr
     def __exit__(self, *args):
-        sys.stdin.flush()
-        sys.stdout.flush()
-        sys.stderr.flush()
-        sys.stdin.buffer._tld.value = self.old_stdin
-        sys.stdout.buffer._tld.value = self.old_stdout
-        sys.stderr.buffer._tld.value = self.old_stderr
+        try:
+            sys.stdin.flush()
+            sys.stdout.flush()
+            sys.stderr.flush()
+        finally:
+            sys.stdin.buffer._tld.value = self.old_stdin
+            sys.stdout.buffer._tld.value = self.old_stdout
+            sys.stderr.buffer._tld.value = self.old_stderr
