@@ -136,6 +136,7 @@ def run_bash(arg, auth_token, zsh=False):
     port = arg[1]
     env = dict(os.environ)
     func_code = '() { python3 -m brutejudge.bashhelper %d %s "$@"; }'%(port, auth_token)
+    print('bash integration enabled. Type `bj help` for help.')
     if zsh: # this sucks
         dotdir = env.get('ZDOTDIR', env['HOME'])
         import tempfile

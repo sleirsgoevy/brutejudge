@@ -1,5 +1,5 @@
 import cmd, sys, traceback, os, shlex
-from .http import login, task_list, submission_list, submission_results, submission_status, submit, status, scores, compile_error, submission_source, task_ids, compiler_list, submission_stats, submission_score, has_feature, contest_list
+from .http import login, tasks, submissions, submission_protocol, submit_solution, status, scores, compile_error, submission_source, compiler_list, submission_stats, has_feature, contest_list
 from .error import BruteError
 import brutejudge.commands
 
@@ -64,14 +64,18 @@ class BruteCMD(cmd.Cmd):
             print(url+'\t'+title)
     def do_tasks(self, cmd):
         """
-        usage: tasks
+        usage: tasks [--verbose]
 
-        Show task list.
+        Show task list. If --verbose is specified, also show additional information.
         """
-        if not isspace(cmd):
+        if not isspace(cmd) and cmd.strip() != '--verbose':
             return self.do_help('tasks')
-        data = task_list(self.url, self.cookie)
-        print(*data)
+        data = tasks(self.url, self.cookie)
+        if cmd.strip() == '--verbose':
+            print('Short name\tLong name')
+            for i, j, k in data: print(j, k, sep='\t\t')
+        else:
+            print(*[i[1] for i in data])
     def do_submissions(self, cmd):
         """
         usage: submissions [subm_id]
@@ -81,12 +85,28 @@ class BruteCMD(cmd.Cmd):
         if not (isspace(cmd) or cmd.strip().isnumeric()):
             return self.do_help('submissions')
         if isspace(cmd):
-            print('Submission ID\tTask')
-            for i, j in zip(*map(reversed, submission_list(self.url, self.cookie))):
-                print('%s\t\t%s'%(i, j))
+            print('Submission ID\tTask\tStatus\t\t\tScore\tTests passed')
+            for x in reversed(submissions(self.url, self.cookie)):
+                print('%d\t\t%s\t%s\t%s\t%s'%tuple(i if i != None else '' for i in x))
         else:
-            for t, (i, j) in enumerate(zip(*submission_results(self.url, self.cookie, int(cmd)))):
-                print('%3d'%(t+1), i, j)
+            print('Test\tVerdict\t\tTime usage\tMemory usage\t...')
+            for t, (i, j) in enumerate(submission_protocol(self.url, self.cookie, int(cmd))):
+                tl = ''
+                if 'time_usage' in j:
+                    tl = '%0.3f'%j['time_usage']
+                    del j['time_usage']
+                ml = ''
+                if 'memory_usage' in j:
+                    ml = j['memory_usage']
+                    del j['memory_usage']
+                    if ml < 2**10: ml = '%d B' % ml
+                    elif ml < 2**20: ml = '%.1f KiB' % (ml / 2**10)
+                    elif ml < 2**30: ml = '%.1f MiB' % (ml / 2**20)
+                    elif ml < 2**40: ml = '%.1f GiB' % (ml / 2**30)
+                    elif ml < 2**50: ml = '%.1f TiB' % (ml / 2**40)
+                    elif ml < 2**60: ml = '%.1f PiB' % (ml / 2**50)
+                    else: ml = '%.1f EiB' % (ml / 2**60)
+                print('%03d\t%s\t%s\t\t%s\t%s'%(t, i, tl, ml, repr(j) if j else ''))
     def do_submit(self, cmd):
         """
         usage: submit <task> <lang_id> <file>
@@ -96,9 +116,9 @@ class BruteCMD(cmd.Cmd):
         sp = cmd.split()
         if len(sp) != 3:
             return self.do_help('submit')
-        tasks = task_list(self.url, self.cookie)
-        try: task_id = tasks.index(sp[0])
-        except ValueError:
+        tasks = tasks(self.url, self.cookie)
+        try: task_id = next(i.id for i in tasks if i.short_name == sp[0])
+        except StopIteration:
             raise BruteError("No such task.")
         if not sp[1].isnumeric():
             raise BruteError("lang_id must be a number")
@@ -109,7 +129,7 @@ class BruteCMD(cmd.Cmd):
             raise BruteError("File not found.")
 #       except UnicodeDecodeError:
 #           raise BruteError("File is binary.")
-        submit(self.url, self.cookie, task_id, int(sp[1]), data)
+        submit_solution(self.url, self.cookie, task_id, int(sp[1]), data)
     def do_shell(self, cmd):
         """
         usage: shell <command>
@@ -129,7 +149,9 @@ class BruteCMD(cmd.Cmd):
             splitted = cmd.split()
             if len(splitted) != 1:
                 return self.do_help('status')
-            print(submission_status(self.url, self.cookie, int(splitted[0])))
+            for i in submissions(self.url, self.cookie):
+                if i.id == int(splitted[0]):
+                    print(i.status)
             return
         ans = status(self.url, self.cookie)
         print('Task\tStatus')
@@ -153,7 +175,9 @@ class BruteCMD(cmd.Cmd):
             try: subm_id = int(cmd)
             except ValueError:
                 return self.do_help('scores')
-            print(submission_score(self.url, self.cookie, subm_id))
+            for i in submissions(self.url, self.cookie):
+                if i.id == int(splitted[0]):
+                    print(i.score)
     def do_source(self, cmd):
         """
         usage: source <submission_id>
@@ -214,7 +238,7 @@ class BruteCMD(cmd.Cmd):
            --. Judge comment
             2. Valuer comment
             1. Compilation error
-            3. Binary xecutable file (JJS only)
+            3. Binary executable file (JJS only)
         """
         sp = cmd.split()
         kwargs = {}

@@ -1,5 +1,5 @@
 import collections
-from brutejudge.http import task_list
+from brutejudge.http import tasks
 from brutejudge.error import BruteError
 import brutejudge._http.types
 
@@ -35,10 +35,10 @@ def do_taskalias(self, cmd):
     if any(eq):
         pairs = [i.split('=', 1) for i in cmd]
     else:
-        tasks = task_list(self.url, self.cookie)
-        if len(tasks) != len(cmd):
+        ts = [i.short_name for i in tasks(self.url, self.cookie)]
+        if len(ts) != len(cmd):
             raise BruteError("The number of arguments must match the number of tasks.")
-        pairs = list(zip(tasks, cmd))
+        pairs = list(zip(ts, cmd))
     for k, v in pairs:
         try: k1 = self.url.taskalias_v2k[k]
         except KeyError: pass

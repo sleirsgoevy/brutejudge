@@ -21,16 +21,16 @@ class Watch(threading.Thread):
             if not self.running: break
             cur = self.exec()
             if cur != self.prev_out:
-                print('Note: `'+self.cmd+'` changed!')
+                print('Note: `'+self.cmd+'` changed!\r')
                 if cur.startswith(self.prev_out):
-                    print('(append)')
-                    print(cur[len(self.prev_out):])
+                    print('(append)\r')
+                    print(cur[len(self.prev_out):].replace('\n', '\r\n'))
                 else:
-                    print('<<<<<<< Was')
-                    print(self.prev_out)
-                    print('=======')
-                    print(cur)
-                    print('<<<<<<< Now')
+                    print('<<<<<<< Was\r')
+                    print(self.prev_out.replace('\n', '\r\n'))
+                    print('=======\r')
+                    print(cur.replace('\n', '\r\n'))
+                    print('<<<<<<< Now\r')
                 self.prev_out = cur
 
 def do_watch(self, args):

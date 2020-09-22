@@ -1,5 +1,5 @@
 import sys
-from brutejudge.http import submission_status
+from brutejudge.http import submissions
 from brutejudge.error import BruteError
 
 def still_running(s):
@@ -17,9 +17,11 @@ def do_astatus(self, cmd):
     chars = '\\|/-'
     idx = 0
     prev = ''
+    subm_id = int(subm_id)
     while True:
-        cur = submission_status(self.url, self.cookie, int(subm_id))
-        if cur == None:
+        try:
+            cur = next(i.status for i in submissions(self.url, self.cookie) if i.id == subm_id)
+        except StopIteration:
             raise BruteError('No such submission')
         cur = cur.strip()
         sys.stderr.write(' '*len(prev)+'\r')

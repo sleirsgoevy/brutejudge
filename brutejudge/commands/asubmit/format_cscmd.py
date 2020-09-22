@@ -1,4 +1,4 @@
-import brutejudge.cheats
+import brutejudge.cheats as cheats
 
 def check_exists(file, options=set()):
     return True

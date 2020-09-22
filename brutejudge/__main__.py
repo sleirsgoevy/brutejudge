@@ -15,4 +15,6 @@ def input(prompt = ''):
 
 cmd.input = input
 
+print('Type `help` for help.')
+print('TIP: use `brutejudge --bash` or `brutejudge --zsh` to integrate brutejudge into your shell')
 BruteCMD().cmdloop()

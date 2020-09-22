@@ -1,4 +1,4 @@
-from brutejudge.http import task_list, scoreboard
+from brutejudge.http import tasks, scoreboard
 from brutejudge.error import BruteError
 
 def format_single(data):
@@ -21,12 +21,12 @@ def do_scoreboard(self, cmd):
     cmd = cmd.strip()
     if cmd:
         return self.do_help('scoreboard')
-    tasks = task_list(self.url, self.cookie)
+    ts = [i.short_name for i in tasks(self.url, self.cookie)]
     scb = scoreboard(self.url, self.cookie)
-    table = [['']+tasks]
+    table = [['']+ts]
     for u, i in scb:
         table.append([u.get('name', '')]+['' if j == None else format_single(j) for j in i])
     if table:
-        clens = [max(len(j[i]) for j in table) for i in range(len(tasks)+1)]
+        clens = [max(len(j[i]) for j in table) for i in range(len(ts)+1)]
         fmt_s = ' '.join('%%%ds'%i for i in clens)
         for i in table: print(fmt_s % tuple(i))

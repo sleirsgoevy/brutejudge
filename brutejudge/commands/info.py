@@ -1,4 +1,4 @@
-from brutejudge.http import task_list, task_ids, problem_info, contest_info
+from brutejudge.http import tasks, problem_info, contest_info
 from brutejudge.error import BruteError
 
 def do_info(self, cmd):
@@ -11,9 +11,8 @@ def do_info(self, cmd):
     if cmd == '--help':
         return self.do_help('info')
     if cmd:
-        tasks = task_list(self.url, self.cookie)
-        try: task_id = task_ids(self.url, self.cookie)[tasks.index(cmd)]
-        except (ValueError, IndexError):
+        try: task_id = next(i.id for i in tasks(self.url, self.cookie) if i.short_name == cmd)
+        except StopIteration:
             raise BruteError("No such task.")
         a, b = problem_info(self.url, self.cookie, task_id)
     else:

@@ -1,18 +1,14 @@
-from brutejudge.http import submit, task_list, task_ids, submission_list, compiler_list, may_cache
+from brutejudge.http import submit_solution, tasks, submissions, compiler_list, may_cache
 from brutejudge.error import BruteError
 import os.path, shlex, sys
 
 def get_lang_id(self, lang_name, task_id):
-    try: task_id = task_ids(self.url, self.cookie)[task_id]
-    except IndexError: raise BruteError("No such task")
     lang_id = [i for i, j, k in compiler_list(self.url, self.cookie, task_id) if j == lang_name]
     try: lang_id, = lang_id
     except ValueError: raise BruteError("Unknown language: "+lang_name)
     return lang_id
 
 def get_possible_lang_id(self, lang_names, task_id):
-    try: task_id = task_ids(self.url, self.cookie)[task_id]
-    except IndexError: raise BruteError("No such task.")
     lang_id = [i for i, j, k in compiler_list(self.url, self.cookie, task_id) if j in lang_names]
     lang_id.append(None)
     return lang_id[0]
@@ -54,6 +50,9 @@ def do_asubmit(self, cmd, *, afmt=False):
         try:
             module = __import__(modname, fromlist=True)
         except ImportError: pass
+        if hasattr(module, 'cheats'):
+            import brutejudge.cheats
+            brutejudge.cheats.cheating(self)
         if not getattr(module, 'check_exists', check_exists)(name, modargs):
             raise BruteError("File not found.")
         if hasattr(module, 'read_file'):
@@ -71,17 +70,16 @@ def do_asubmit(self, cmd, *, afmt=False):
         sys.stdout.buffer.flush()
         return
     with may_cache(self.url, self.cookie):
-        tasks = task_list(self.url, self.cookie)
-        try: task_id = tasks.index(sp[0])
-        except ValueError:
+        try: task_id = next(i.id for i in tasks(self.url, self.cookie) if i.short_name == sp[0])
+        except StopIteration:
             raise BruteError("No such task.")
         if not sp[1].isnumeric():
             sp[1] = get_lang_id(self, sp[1], task_id)
-        before = submission_list(self.url, self.cookie)[0]
-        submit(self.url, self.cookie, task_id, int(sp[1]), data)
-    after = submission_list(self.url, self.cookie)[0]
+        before = submissions(self.url, self.cookie)
+        submit_solution(self.url, self.cookie, task_id, int(sp[1]), data)
+    after = submissions(self.url, self.cookie)
     if before == after:
         raise BruteError("Error while sending.")
     else:
-        print('Submission ID is', after[0])
-        if wait: self.do_astatus(str(after[0]))
+        print('Submission ID is', after[0].id)
+        if wait: self.do_astatus(str(after[0].id))
