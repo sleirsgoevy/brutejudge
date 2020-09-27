@@ -157,20 +157,20 @@ class Informatics(Ejudge):
         with self.cache_lock: self.stop_caching()
     def status(self):
         if not self.registered: return {}
-        self.submission_list()
+        self.submissions()
         by_task = {}
         for a, b, c, d, e in self.subm_list_partial:
             if b not in by_task or by_task[b][1] < c[1]:
-                by_task[b] = c
-        return collections.OrderedDict((i, by_task.get(i, (None,))[0]) for i in self.task_list())
+                by_task[int(b)] = c
+        return collections.OrderedDict((str(i), by_task.get(i, (None,))[0]) for i in self.task_list)
     def scores(self):
         if not self.registered: return {}
-        self.submission_list()
+        self.submissions()
         by_task = {}
         for a, b, c, d, e in self.subm_list_partial:
             if d != None and (b not in by_task or by_task[b] < d):
-                by_task[b] = d
-        return collections.OrderedDict((i, by_task.get(i, None)) for i in self.task_list())
+                by_task[int(b)] = d
+        return collections.OrderedDict((str(i), by_task.get(i, None)) for i in self.task_list)
     def compile_error(self, id):
         data = self._request_json("/py/protocol/get/%d"%int(id))
         return data.get('compiler_output', data.get('protocol', '')) or None
