@@ -106,7 +106,7 @@ class BruteCMD(cmd.Cmd):
                     elif ml < 2**50: ml = '%.1f TiB' % (ml / 2**40)
                     elif ml < 2**60: ml = '%.1f PiB' % (ml / 2**50)
                     else: ml = '%.1f EiB' % (ml / 2**60)
-                print('%03d\t%s\t%s\t\t%s\t%s'%(t, i, tl, ml, repr(j) if j else ''))
+                print('%03d\t%s\t%s\t\t%s\t%s'%(t+1, i, tl, ml, repr(j) if j else ''))
     def do_submit(self, cmd):
         """
         usage: submit <task> <lang_id> <file>
