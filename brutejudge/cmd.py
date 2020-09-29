@@ -275,11 +275,9 @@ class BruteCMD(cmd.Cmd):
         task = cmd.strip()
         if not task:
             return self.do_help('compilers')
-        tasks = task_list(self.url, self.cookie)
-        ids = task_ids(self.url, self.cookie)
         try:
-            prob_id = ids[tasks.index(task)]
-        except (ValueError, IndexError):
+            prob_id = next(i.id for i in tasks(self.url, self.cookie) if i.short_name == task)
+        except StopIteration:
             raise BruteError("No such task")
         ans = compiler_list(self.url, self.cookie, prob_id)
         print("ID\tCompiler")
