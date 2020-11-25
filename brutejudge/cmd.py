@@ -165,10 +165,16 @@ class BruteCMD(cmd.Cmd):
         Show scores for each task if subm_id is not specified.
         """
         if isspace(cmd):
-            ans = scores(self.url, self.cookie)
+            if has_feature(self.url, self.cookie, 'scores', 'total'):
+                ans = scores(self.url, self.cookie, total=True)
+            else:
+                ans = scores(self.url, self.cookie)
             print('Task\tScore')
             for k, v in ans.items():
-                print(k+'\t'+str(v))
+                if k is not True:
+                    print(k+'\t'+str(v))
+            if True in ans:
+                print('Total score:', ans[True])
         else:
             if len(cmd.split()) != 1:
                 return self.do_help('scores')

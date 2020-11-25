@@ -268,18 +268,23 @@ class Ejudge(Backend):
         data = [x.split("</td>")[0] for x in splitted]
         idx = ths.index('Status')
         return collections.OrderedDict((a, b if b != '&nbsp;' else None) for a, b in zip(data[ths.index('Short name')::w], data[idx::w]))
-    def scores(self):
+    def scores(self, *, total=None):
         code, headers, data = self._cache_get(self.urls['summary'])
         if b'<input type="submit" name="action_35" value="Change!" />' in data:
             raise BruteError("Password change is required.")
         if code != 200:
             raise BruteError("Failed to fetch task list")
-        ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8').split('<th class="b1">')[1:]]
+        data0 = data.decode('utf-8')
+        ths = [i.split('</th>', 1)[0] for i in data0.split('<th class="b1">')[1:]]
         w = len(ths)
         splitted = data.decode('utf-8').split('<td class="b1">')[1:]
         data = [x.split("</td>")[0] for x in splitted]
-        if 'Score' not in ths: return {}
-        return collections.OrderedDict(zip(data[ths.index('Short name')::w], [None if x == '&nbsp;' else int(x) for x in data[ths.index('Score')::w]]))
+        if 'Score' not in ths: ans = {}
+        else: ans = collections.OrderedDict(zip(data[ths.index('Short name')::w], [None if x == '&nbsp;' else int(x) for x in data[ths.index('Score')::w]]))
+        if total != None and '<p><big>Total score: ' in data0:
+            try: ans[total] = int(data0.split('<p><big>Total score: ', 1)[1].split('</big></p>', 1)[0])
+            except (ValueError, IndexError): pass
+        return ans
     def compile_error(self, id):
         code, headers, data = self._cache_get(self.urls['protocol'].format(run_id=id))
         if b'<input type="submit" name="action_35" value="Change!" />' in data:
@@ -370,10 +375,15 @@ class Ejudge(Backend):
             if datas[k2] == 'Unlimited':
                 data1[k1] = math.inf
                 continue
-            date, s_time = datas[k2].split(' ')
-            year, month, day = map(int, date.split('/'))
-            hour, minute, second = map(int, s_time.split(':'))
-            data1[k1] = time.mktime((year, month, day, hour, minute, second, -1, -1, -1))
+            if ' ' in datas[k2]:
+                date, s_time = datas[k2].split(' ')
+                year, month, day = map(int, date.split('/'))
+                hour, minute, second = map(int, s_time.split(':'))
+                data1[k1] = time.mktime((year, month, day, hour, minute, second, -1, -1, -1))
+            else:
+                data1[k1] = 0
+                for i in map(int, datas[k2].split(':')):
+                    data1[k1] = data1[k1] * 60 + i
         if 'contest_start' in data1 and 'contest_duration' in data1:
             data1['contest_end'] = data1['contest_start'] + data1['contest_duration']
         if 'contest_start' in data1 and 'server_time' in data1:
