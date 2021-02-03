@@ -54,7 +54,7 @@ def torsocks_workaround():
     arch = un.machine
     is_x86 = len(arch) == 4 and arch.startswith('i') and arch.endswith('86') and arch[1] in '3456'
     is_x86_64 = arch == 'x86_64'
-    if un.sysname != 'Linux' and not (is_x86 or is_x86_64) or os.path.isdir('/system'):
+    if un.sysname != 'Linux' or not (is_x86 or is_x86_64) or os.path.isdir('/system'):
         print('Running brutejudge --bash under torsocks is not supported on your system.')
         exit(1)
     import ctypes, mmap
