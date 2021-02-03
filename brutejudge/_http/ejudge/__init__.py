@@ -112,15 +112,17 @@ class Ejudge(Backend):
         return url.startswith('http://') or url.startswith('https://')
     def __init__(self, url, login, password):
         Backend.__init__(self)
+        url0 = url
         url = url.replace('/new-register?', '/new-client?')
         contest_id = url.split("contest_id=")[1].split("&")[0]
         self.contest_id = int(contest_id)
         base_url = url.split("?")[0]
-        code, headers, data = post(base_url, {'contest_id': contest_id, 'locale_id': 0, 'login': login, 'password': password, 'action_213': ''})
+        code, headers, data = post(url0.split("?")[0], {'contest_id': contest_id, 'locale_id': 0, 'login': login, 'password': password, 'action_213': ''})
         if code != 302:
             raise BruteError("Login failed.")
         rhd = dict(headers)
         base_url = rhd['Location'].split('&')[0]
+        base_url = base_url.replace('/new-register?', '/new-client?')
         if 'new-client?SID=' in base_url:
             urls = ej371.get_urls(base_url)
         elif any(i in base_url for i in ('/user/', '/client/', '/register/', '/register?SID=')):

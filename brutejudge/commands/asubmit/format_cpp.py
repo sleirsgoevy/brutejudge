@@ -83,7 +83,7 @@ def format(original, options=set(), cplusplus=True):
             s[i] = j[:-2]+'(void)'
         if '+cexpr' in options and j.startswith('#pragma cexpr '):
             from .format_cexpr import format as format_cexpr
-            s[i] = format_cexpr(j[14:], options, stdio=False).strip()
+            s[i] = escape_strings(format_cexpr(unescape_strings(j[14:]), options, stdio=False).strip())
     s = [i.rstrip() for i in '\n'.join(s).split('\n')]
     i = 0
     while i < len(s):

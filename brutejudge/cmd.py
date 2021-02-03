@@ -182,7 +182,7 @@ class BruteCMD(cmd.Cmd):
             except ValueError:
                 return self.do_help('scores')
             for i in submissions(self.url, self.cookie):
-                if i.id == int(splitted[0]):
+                if i.id == subm_id:
                     print(i.score)
     def do_source(self, cmd):
         """

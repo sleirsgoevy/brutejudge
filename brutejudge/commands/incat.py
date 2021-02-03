@@ -2,7 +2,7 @@ import brutejudge.cheats
 from brutejudge.commands.asubmit import get_possible_lang_id
 from brutejudge.commands.astatus import still_running
 from brutejudge.commands.samples import get_samples
-from brutejudge.http import task_list, submit, submission_list, submission_status, compile_error
+from brutejudge.http import tasks, submit_solution, submission_list, submission_status, compile_error
 from brutejudge._http.codeforces import CodeForces
 from brutejudge.error import BruteError
 import shlex, sys, random
@@ -48,10 +48,12 @@ def do_incat(self, cmd):
         return self.do_help('incat')
     data.append(None)
     task, filepath, savepath = data[:3]
-    tasks = task_list(self.url, self.cookie)
-    try:
-        task_id = tasks.index(task)
-    except ValueError:
+    task_list = tasks(self.url, self.cookie)
+    for i in task_list:
+        if i[1] == task:
+            task_id = i[0]
+            break
+    else:
         raise BruteError("No such task.")
     if savepath == None:
         f = sys.stdout
@@ -82,7 +84,7 @@ def incat(self, task, task_id, filepath, f, filter='', custom_include=None):
         cerr_output = r"""
     if(%d < included_s.size())
         cerr << included_s.substr(%d, 65536);"""%(lans + 65536, lans + 65536)
-        submit(self.url, self.cookie, task_id, get_possible_lang_id(self, ('g++', 'g++-32'), task_id), r"""
+        submit_solution(self.url, self.cookie, task_id, get_possible_lang_id(self, ('g++', 'g++-32'), task_id), r"""
 asm("included:\n%s.byte 0\nincluded_length:\n.long included_length-included-1");
 
 //random: %r
