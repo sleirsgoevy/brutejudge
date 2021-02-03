@@ -1,4 +1,4 @@
-import socket, threading, os, pty, tty, select, sys, shlex, subprocess, io, signal
+import socket, threading, os.path, pty, tty, select, sys, shlex, subprocess, io, signal, functools
 
 mustexit = None
 
@@ -46,9 +46,78 @@ def io_server_thread(sock, stdin, stdout, stderr, efd):
 
 tld_devtty = threading.local()
 
+def torsocks_workaround():
+    lp = os.getenv('LD_PRELOAD')
+    if lp == None or not any('torsocks' in os.path.basename(i) for i in lp.split(':')):
+        return socket.socket.connect, 'no_torsocks'
+    un = os.uname()
+    arch = un.machine
+    is_x86 = len(arch) == 4 and arch.startswith('i') and arch.endswith('86') and arch[1] in '3456'
+    is_x86_64 = arch == 'x86_64'
+    if un.sysname != 'Linux' and not (is_x86 or is_x86_64) or os.path.isdir('/system'):
+        print('Running brutejudge --bash under torsocks is not supported on your system.')
+        exit(1)
+    import ctypes, mmap
+    libc = ctypes.CDLL('libc.so.6')
+    libc.mmap.restype = ctypes.POINTER(ctypes.c_char)
+    libc.mmap.argtypes = (ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_longlong)
+    errno = ctypes.c_int.in_dll(libc, 'errno')
+    ram = libc.mmap(None, 4096, mmap.PROT_READ|mmap.PROT_WRITE|4, mmap.MAP_PRIVATE|mmap.MAP_ANONYMOUS, -1, 0)
+    if ctypes.cast(ram, ctypes.c_void_p).value == ctypes.c_void_p(-1).value:
+        ctypes.pythonapi.PyErr_SetFromErrno(ctypes.py_object(OSError))
+    if is_x86:
+        # push ebx
+        # mov eax, __NR_socketcall
+        # mov ebx, [esp+8]
+        # mov ecx, [esp+12]
+        # int 0x80
+        # pop ebx
+        # ret
+        for i, x in enumerate(b'\x53\xb8\x66\x00\x00\x00\x8b\x5c\x24\x08\x8b\x4c\x24\x0c\xcd\x80\x5b\xc3'): ram[i] = x
+        _socketcall = ctypes.cast(ram, ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_char_p))
+        def socketcall(fd, *args):
+            param = b''
+            for i in args:
+                sz = ctypes.sizeof(i)
+                ptr = ctypes.cast(ctypes.pointer(i), ctypes.POINTER(ctypes.c_char))
+                param += bytes(ptr[i] for i in range(sz))
+            return _socketcall(fd, param)
+        def _connect(fd, addr, sz):
+            return socketcall(fd, ctypes.c_char_p(addr), ctypes.c_size_t(sz))
+    elif is_x86_64:
+        # mov eax, __NR_connect
+        # syscall
+        # ret
+        for i, x in enumerate(b'\xb8\x2a\x00\x00\x00\x0f\x05\xc3'): ram[i] = x
+        _connect = ctypes.cast(ram, ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_char_p, ctypes.c_size_t))
+    else: assert False
+    def connect(sock, addr):
+        fd = sock.fileno()
+        host, port = addr
+        host = socket.inet_aton(host)
+        port = port.to_bytes(2, 'big')
+        addr = socket.AF_INET.to_bytes(2, 'little') + port + host
+        addr += bytes(16 - len(addr))
+        ans = _connect(fd, addr, len(addr))
+        if ans < 0:
+            errno.value = -ans
+            ctypes.pythonapi.PyErr_SetFromErrno(ctypes.py_object(socket.error))
+    return connect, 'torsocks'
+
+sock_connect, torsocks_type = torsocks_workaround()
+
 def io_server(brute, sock, auth_token, tty_conf):
     auth = readline(sock)
+    if auth.count(':') != 1:
+        sock.close()
+        return
+    ts_type, auth = auth.split(':')
     if auth != auth_token:
+        sock.close()
+        return
+    if ts_type != torsocks_type:
+        msg = b'Run the whole brutejudge session under torsocks!\r\n'
+        sock.sendall(('stdout %d\n'%len(msg)).encode('ascii')+msg+b'exit \0')
         sock.close()
         return
     mode, command = readline(sock).split(' ', 1)
@@ -157,8 +226,9 @@ def run_bash(arg, auth_token, zsh=False):
     os.kill(os.getpid(), signal.SIGINT)
 
 def io_client(port, auth_token, cmd):
-    sock = socket.create_connection(('127.0.0.1', port))
-    sock.sendall((auth_token+'\n').encode('utf-8'))
+    sock = socket.socket()
+    sock_connect(sock, ('127.0.0.1', port))
+    sock.sendall((torsocks_type+':'+auth_token+'\n').encode('utf-8'))
     if sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty():
         mode = 'pty'
     else:
