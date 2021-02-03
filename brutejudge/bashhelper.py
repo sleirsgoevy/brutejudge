@@ -75,15 +75,17 @@ def torsocks_workaround():
         # ret
         for i, x in enumerate(b'\x53\xb8\x66\x00\x00\x00\x8b\x5c\x24\x08\x8b\x4c\x24\x0c\xcd\x80\x5b\xc3'): ram[i] = x
         _socketcall = ctypes.cast(ram, ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_int, ctypes.c_char_p))
-        def socketcall(fd, *args):
+        def socketcall(call, *args):
             param = b''
             for i in args:
                 sz = ctypes.sizeof(i)
-                ptr = ctypes.cast(ctypes.pointer(i), ctypes.POINTER(ctypes.c_char))
-                param += bytes(ptr[i] for i in range(sz))
-            return _socketcall(fd, param)
+                ptr = ctypes.cast(ctypes.pointer(i), ctypes.POINTER(ctypes.c_char*sz))
+                data = ptr[0][:]
+                data += bytes(ctypes.sizeof(ctypes.c_long) - len(data))
+                param += data
+            return _socketcall(call, param)
         def _connect(fd, addr, sz):
-            return socketcall(fd, ctypes.c_char_p(addr), ctypes.c_size_t(sz))
+            return socketcall(3, ctypes.c_int(fd), ctypes.c_char_p(addr), ctypes.c_size_t(sz))
     elif is_x86_64:
         # mov eax, __NR_connect
         # syscall
