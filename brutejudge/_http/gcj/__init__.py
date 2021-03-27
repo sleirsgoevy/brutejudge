@@ -103,7 +103,7 @@ class GCJ(Backend):
         return [bjtypes.test_t(self._convert_verdict(i['verdict__str']), {'time_usage': i['running_time_nanos']/1000000000, 'memory_usage': i['running_memory_mbs']*1048576}) for i in subm]
     def submit_solution(self, task, lang, code):
         if isinstance(code, bytes): code = code.decode('utf-8', 'replace')
-        self._json_req('https://codejam.googleapis.com/dashboard/%s/submit'%self.round, {'code': code, 'language_id': lang, 'task_id': task}, do_post=True)
+        self._json_req('https://codejam.googleapis.com/dashboard/%s/submit'%self.round, {'code': code, 'language_id': lang, 'task_id': '%016x'%task}, do_post=True)
         with self.cache_lock: self.stop_caching()
     def status(self):
         user_data = {}

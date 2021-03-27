@@ -8,7 +8,7 @@ def read_file(name, options=set(), includes=None):
     includes.add(name)
     with open(name) as file:
         lines = file.read().split('\n')
-    if '-include' not in options:
+    if '+include' in options:
         for i in range(len(lines)):
             l = lines[i]
             if l.startswith('#include "'):
@@ -74,12 +74,12 @@ def format(original, options=set(), cplusplus=True):
     s = [i.rstrip() for i in original.split('\n')]
     for i, j in enumerate(s):
         stripped = j.strip()
-        if cplusplus and '-mods' not in options and stripped in ('public:', 'private:', 'protected:'):
+        if cplusplus and '+mods' in options and stripped in ('public:', 'private:', 'protected:'):
             l = j.find(stripped)
             while l % 4 != 1:
                 l += 1
             s[i] = ' ' * l + stripped
-        if (not cplusplus and '-funcvoid' not in options) and j == stripped and j.endswith('()'):
+        if (not cplusplus and '+funcvoid' in options) and j == stripped and j.endswith('()'):
             s[i] = j[:-2]+'(void)'
         if '+cexpr' in options and j.startswith('#pragma cexpr '):
             from .format_cexpr import format as format_cexpr
@@ -119,7 +119,7 @@ def format(original, options=set(), cplusplus=True):
         i += 1
     s = '\n'.join(s)
     while ' \n' in s: s = s.replace(' \n', '\n')
-    if '-ifspc' not in options:
+    if '+ifspc' in options:
         i = 0
         while i < len(s):
             for j in ('if', 'while', 'for', 'switch'):
