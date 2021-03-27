@@ -88,6 +88,14 @@ class GCJ(Backend):
         if s == 'Correct':
             return 'OK'
         return s
+    @staticmethod
+    def _convert_stats(i):
+        ans = {}
+        if 'running_time_nanos' in i:
+            ans['time_usage'] = i['running_time_nanos'] / 1000000000
+        if 'running_memory_mbs' in i:
+            ans['memory_usage'] = i['running_memory_mbs'] * 1048576
+        return ans
     def _submission_descr(self, subm_id):
         subm_id = int(subm_id)
         data = self._get_which('attempts', "Failed to fetch submission list.")
@@ -100,7 +108,7 @@ class GCJ(Backend):
         if subm == None: return []
         try: subm = subm['judgement']['results']
         except KeyError: return []
-        return [bjtypes.test_t(self._convert_verdict(i['verdict__str']), {'time_usage': i['running_time_nanos']/1000000000, 'memory_usage': i['running_memory_mbs']*1048576}) for i in subm]
+        return [bjtypes.test_t(self._convert_verdict(i['verdict__str']), self._convert_stats(i)) for i in subm]
     def submit_solution(self, task, lang, code):
         if isinstance(code, bytes): code = code.decode('utf-8', 'replace')
         self._json_req('https://codejam.googleapis.com/dashboard/%s/submit'%self.round, {'code': code, 'language_id': lang, 'task_id': '%016x'%task}, do_post=True)
