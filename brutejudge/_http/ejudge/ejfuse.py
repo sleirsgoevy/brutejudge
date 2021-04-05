@@ -2,7 +2,8 @@ from brutejudge._http.ejudge import Ejudge, do_http, get, post
 from brutejudge._http.ejudge.ej371 import get_urls
 from brutejudge.error import BruteError
 from brutejudge._http.base import Backend
-import json, base64, collections
+import json, base64, collections, math
+import brutejudge._http.types as bjtypes
 
 def mbjson(x):
     try: return json.loads(x)
@@ -67,7 +68,7 @@ class EJFuse(Ejudge):
         data = mbjson(data)
         if code != 200 or not data or not data['ok']:
             raise BruteError("Failed to fetch task list.")
-        return [bjtypes.task_t(i, i['short_name'], i['name']) for i in data['result']['problems']]
+        return [bjtypes.task_t(i['id'], i['short_name'], i['long_name']) for i in data['result']['problems']]
     def _submission_list(self):
         code, headers, data = self._cache_get(self.url+'?SID=%s&EJSID=%s&action=list-runs-json&prob_id=0&json=1'%self.cookies, False)
         data = mbjson(data)
@@ -76,7 +77,7 @@ class EJFuse(Ejudge):
         return data['result']['runs']
     def submissions(self):
         data = self._submission_list()
-        tl, ti = list(zip(*self.tasks()))
+        ti, tl, tll = list(zip(*self.tasks()))
         ti = {j:i for i, j in enumerate(ti)}
         return [bjtypes.submission_t(i['run_id'], tl[ti[i['prob_id']]], STATUS_NAMES[i['status']], i.get('score', None), None) for i in data]
     def _submission_descr(self, run_id):
@@ -150,9 +151,9 @@ class EJFuse(Ejudge):
             return x.decode('utf-8', 'replace')
         subm = self._submission_descr(subm_id)
         if 'testing_report' in subm and 'valuer_comment' in subm['testing_report'] and kind in (None, 2):
-            return _decode_bytes(base64.b64decode(subm['testing_report']['valuer_comment']))
+            return _decode_bytes(subm['testing_report']['valuer_comment'])
         elif 'compiler_output' in subm and kind in (None, 1):
-            return _decode_bytes(base64.b64decode(subm['compiler_output']))
+            return _decode_bytes(subm['compiler_output'])
         else:
             return None
     def submission_status(self, subm_id):
@@ -172,7 +173,7 @@ class EJFuse(Ejudge):
         data = mbjson(data)
         if code != 200 or not data or not data['ok']:
             raise BruteError("Failed to fetch compiler list.")
-        return [(i['id'], i['short_name'], i['long_name']) for i in data['result']['compilers']]
+        return [bjtypes.compiler_t(i['id'], i['short_name'], i['long_name']) for i in data['result']['compilers']]
     def contest_info(self):
         code, headers, data = self._cache_get(self.url+'?SID=%s&EJSID=%s&action=contest-status-json&json=1'%self.cookies, False)
         data = mbjson(data)
@@ -180,16 +181,21 @@ class EJFuse(Ejudge):
             raise BruteError("Failed to fetch contest info.")
         datas = {}
         data1 = {}
-        datas['Server time:'] = data1['server_time'] = data['server_time']
-        datas['Contest start time'] = data1['contest_start'] = data['start_time']
-        datas['Duration:'] = data1['contest_duration'] = data['duration']
+        ctst = data['result']['contest']
+        ctst.update(data)
+        #datas['Server time:'] = data1['server_time'] = data['server_time']
+        data1['server_time'] = data['server_time']
+        #datas['Contest start time'] = data1['contest_start'] = ctst['start_time']
+        data1['contest_start'] = ctst['start_time']
+        #datas['Duration:'] = data1['contest_duration'] = math.inf if ctst['is_unlimited'] else ctst['duration']
+        data1['contest_duration'] = math.inf if ctst['is_unlimited'] else ctst['duration']
         if 'end_time' in data:
-            datas['contest_end'] = data['end_time']
-        elif 'contest_start' in datas and 'contest_duration' in datas:
-            datas['contest_end'] = datas['contest_start'] + datas['contest_duration']
-        if 'server_time' in datas and 'contest_start' in datas:
-            datas['contest_time'] = datas['server_time'] - datas['contest_start']
-        return ('', data1, datas)
+            data1['contest_end'] = data['end_time']
+        elif 'contest_start' in data1 and 'contest_duration' in data1:
+            data1['contest_end'] = data1['contest_start'] + data1['contest_duration']
+        if 'server_time' in data1 and 'contest_start' in data1:
+            data1['contest_time'] = data1['server_time'] - data1['contest_start']
+        return ('', datas, data1)
     def submission_stats(self, subm_id):
         subm = self._submission_descr(subm_id)
         ans = {}

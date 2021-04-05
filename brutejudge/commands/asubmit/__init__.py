@@ -27,19 +27,19 @@ def do_asubmit(self, cmd, *, afmt=False):
     modname = ''
     wait = False
     sp = shlex.split(cmd)
-    if len(sp) not in range(3, 7):
-        return self.do_help('asubmit')
+    if len(sp) not in (range(3, 7) if not afmt else (1, 3)):
+        return self.do_help('aformat' if afmt else 'asubmit')
     if not afmt and sp[0] == '-w':
         wait = True
         del sp[0]
-    if len(sp) not in (3, 5):
-        return self.do_help('asubmit')
+    if len(sp) not in ((3, 5) if not afmt else (1, 3)):
+        return self.do_help('aformat' if afmt else 'asubmit')
     if sp[0] == '-x':
         modname = sp[1]
         del sp[:2]
         if modname[:1] == '.': modname = 'brutejudge.commands.asubmit.format_'+modname[1:]
     if len(sp) != (1 if afmt else 3):
-        return self.do_help('asubmit')
+        return self.do_help('aformat' if afmt else 'asubmit')
     try:
         name = sp[-1]
         module = None

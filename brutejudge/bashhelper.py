@@ -152,6 +152,8 @@ def io_server(brute, sock, auth_token, tty_conf):
         with RedirectSTDIO(cstdin_f, cstdout_f, cstderr_f):
             brute.onecmd(command)
     except SystemExit as e:
+        if isinstance(brute, ForkingBrute): #we're in fork
+            raise
         if len(e.args) == 1 and isinstance(e.args[0], int):
             exitstatus = e.args[0]
         elif len(e.args) == 1:
@@ -265,13 +267,58 @@ def smart_quote(x):
     if not (set(' \\\'\"\n') & set(x)): return x
     return shlex.quote(x)
 
+class ForkingBrute:
+    def __init__(self):
+        import pickle
+        self.brute = pickle.dumps(None)
+        self.unpickle_failed = False
+        self.execute(self.init)
+        if self.brute == pickle.dumps(None):
+            raise RuntimeError("ForkingBrute failed to initialize")
+    def init(self):
+        import brutejudge.cmd
+        self.brute = brutejudge.cmd.BruteCMD()
+        self.brute.stdin = self.brute.stdout = None
+    def do_onecmd(self, cmd):
+        self.brute.stdin = sys.stdin
+        self.brute.stdout = sys.stdout
+        self.brute.onecmd(cmd)
+        self.brute.stdin = self.brute.stdout = None
+    def execute(self, fn, *args):
+        import pickle
+        pipe = os.pipe()
+        pid = os.fork()
+        if not pid:
+            try:
+                os.close(pipe[0])
+                try: self.brute = pickle.loads(self.brute)
+                except:
+                    self.unpickle_failed = True
+                    raise
+                fn(*args)
+                with open(pipe[1], 'wb') as file: file.write(pickle.dumps(self.brute))
+                sys.exit(0)
+            except SystemExit: raise
+            except BaseException:
+                sys.excepthook(*sys.exc_info())
+                with open(pipe[1], 'wb') as file: file.write(self.brute if self.unpickle_failed else pickle.dumps(self.brute))
+                sys.exit(1)
+        os.close(pipe[1])
+        os.waitpid(pid, 0)
+        with open(pipe[0], 'rb') as file: self.brute = file.read()
+    def onecmd(self, cmd):
+        self.execute(self.do_onecmd, cmd)
+
 def main():
     signal.signal(signal.SIGTTIN, signal.SIG_IGN)
     signal.signal(signal.SIGTTOU, signal.SIG_IGN)
     if len(sys.argv) == 1 or sys.argv[1] in ('--bash', '--zsh'):
         hook_stdio()
-        import brutejudge.cmd
-        brute = brutejudge.cmd.BruteCMD()
+        if 'BJ_PICKLE' in os.environ:
+            brute = ForkingBrute()
+        else:
+            import brutejudge.cmd
+            brute = brutejudge.cmd.BruteCMD()
         auth_token = '%0128x'%int.from_bytes(os.urandom(64), 'big')
         start_io_server(brute, auth_token, zsh=(len(sys.argv) > 1 and sys.argv[1] == '--zsh'))
     else:
