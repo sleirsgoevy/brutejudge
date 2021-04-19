@@ -72,6 +72,15 @@ def format(original, options=set(), cplusplus=True):
     original = escape_strings(original)
     i = 0
     s = [i.rstrip() for i in original.split('\n')]
+    while i < len(s):
+        if s[i] == '#pragma cut before':
+            del s[:i+1]
+            i = 0
+            continue
+        if s[i] in ('#pragma cut', '#pragma cut after'):
+            del s[i:]
+            break
+        i += 1
     for i, j in enumerate(s):
         stripped = j.strip()
         if cplusplus and '+mods' in options and stripped in ('public:', 'private:', 'protected:'):

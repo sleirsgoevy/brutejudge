@@ -113,36 +113,36 @@ class EJFuse(Ejudge):
 #       data = b'\r\n'.join(b'--'+x+b'\r\nContent-Disposition: form-data; name='+i for i in data)+b'\r\n--'+x+b'--\r\n'
 #       return post(self.url, data, {'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii')})
     def status(self):
-        tl, ti = self._task_list_ids()
+        tli = self.tasks()
         sl = self._submission_list()
         ans = collections.OrderedDict()
-        for i, prob_id in enumerate(ti):
-            code, headers, data = self._cache_get(self.url+'?SID=%s&EJSID=%s&action=problem-status-json&problem=%%d&json=1'%self.cookies%prob_id, False)
+        for task in tli:
+            code, headers, data = self._cache_get(self.url+'?SID=%s&EJSID=%s&action=problem-status-json&problem=%%d&json=1'%self.cookies%task.id, False)
             data = mb_problem_status(data)
             if code != 200 or not data or not data['ok']:
                 raise BruteError("Failed to fetch task list.")
             try: best_run = data['result']['problem_status']['best_run']
-            except KeyError: ans[tl[i]] = None
+            except KeyError: ans[task.short_name] = None
             else:
                 for j in sl:
                     if j['run_id'] == best_run:
                         st = STATUS_NAMES[j['status']]
-                        if st not in ('OK', 'Compiling...', 'Running...', 'Compilation error'):
+                        if st not in ('OK', 'Compiling...', 'Running...', 'Compilation error', 'Pending review', 'Pending check', 'Rejected', 'Style violation'):
                             st = 'Partial solution'
-                        ans[tl[i]] = st
+                        ans[task.short_name] = st
                         break
-                else: ans[tl[i]] = None
+                else: ans[task.short_name] = None
         return ans
     def scores(self):
-        tl, ti = self._task_list_ids()
+        tli = self.tasks()
         ans = collections.OrderedDict()
-        for i, prob_id in enumerate(ti):
-            code, headers, data = self._cache_get(self.url+'?SID=%s&EJSID=%s&action=problem-status-json&problem=%%d&json=1'%self.cookies%prob_id, False)
+        for task in tli:
+            code, headers, data = self._cache_get(self.url+'?SID=%s&EJSID=%s&action=problem-status-json&problem=%%d&json=1'%self.cookies%task.id, False)
             data = mb_problem_status(data)
             if code != 200 or not data or not data['ok']:
                 raise BruteError("Failed to fetch task list.")
-            try: ans[tl[i]] = data['result']['problem_status']['best_score']
-            except KeyError: ans[tl[i]] = None
+            try: ans[task.short_name] = data['result']['problem_status']['best_score']
+            except KeyError: ans[task.short_name] = None
         return ans
     def compile_error(self, subm_id, *, binary=False, kind=None):
         def _decode_bytes(x):
