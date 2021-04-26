@@ -16,6 +16,7 @@ def readline(sock):
 
 def io_server_thread(sock, stdin, stdout, stderr, efd):
     try:
+        sock.sendall(('pid %d\n'%os.getpid()).encode('utf-8'))
         fd_set = {sock.fileno(), stdout, stderr, efd}
         while True:
             l = select.select(list(fd_set), [], [])[0]
@@ -242,8 +243,27 @@ def io_client(port, auth_token, cmd):
         old = tty.tcgetattr(0)
         tty.setraw(0)
     try:
+        pid = None
+        have_int = [False, False]
+        def handler(*args):
+            if have_int[1]:
+                have_int[1] = False
+                raise KeyboardInterrupt
+            have_int[0] = True
+        signal.signal(signal.SIGINT, handler)
         while True:
-            for i in select.select([sys.stdin.fileno(), sock.fileno()], [], [])[0]:
+            try:
+                have_int[1] = True
+                if have_int[0]:
+                    have_int[0] = False
+                    have_int[1] = False
+                    raise KeyboardInterrupt
+                r = select.select([sys.stdin.fileno(), sock.fileno()], [], [])[0]
+                have_int[1] = False
+            except KeyboardInterrupt:
+                if pid == None: raise
+                os.kill(pid, signal.SIGINT)
+            for i in r:
                 if i == sys.stdin.fileno():
                     sock.sendall(sys.stdin.buffer.raw.read(1048576))
                 elif i == sock.fileno():
@@ -253,6 +273,9 @@ def io_client(port, auth_token, cmd):
                     if where == 'exit':
                         sock.close()
                         exit(l)
+                    elif where == 'pid':
+                        pid = l
+                        continue
                     data = b''
                     while len(data) < l: data += sock.recv(l - len(data))
                     if where == 'stdout': sys.stdout.buffer.raw.write(data)
