@@ -209,11 +209,14 @@ def run_bash(arg, auth_token, zsh=False):
     global mustexit
     port = arg[1]
     env = dict(os.environ)
+    ppath = os.environ.get('PYTHONPATH', None)
+    ppath = os.path.split(os.path.split(__file__)[0])[0]+(':'+ppath if ppath != None else '')
+    env['PYTHONPATH'] = ppath
     func_code = '() { python3 -m brutejudge.bashhelper %d %s "$@"; }'%(port, auth_token)
     print('bash integration enabled. Type `bj help` for help.')
-    if zsh: # this sucks
+    import tempfile
+    if zsh:
         dotdir = env.get('ZDOTDIR', env['HOME'])
-        import tempfile
         with tempfile.TemporaryDirectory() as dir:
             with open(dir+'/.zshrc', 'w') as file:
                 file.write('source '+shlex.quote(dotdir+'/.zshrc')+'\n')
@@ -222,12 +225,12 @@ def run_bash(arg, auth_token, zsh=False):
             env['ZDOTDIR'] = dir
             mustexit = subprocess.call('zsh', env=env)
     else:
-        for i in ('BASH_FUNC_%s%%%%', 'BASH_FUNC_%s()', '%s'):
-            env[i%'command_not_found_handle'] = env[i%'bj'] = func_code
-        ppath = os.environ.get('PYTHONPATH', None)
-        ppath = os.path.split(os.path.split(__file__)[0])[0]+(':'+ppath if ppath != None else '')
-        env['PYTHONPATH'] = ppath
-        mustexit = subprocess.call('bash', env=env)
+        with tempfile.NamedTemporaryFile(mode='w') as file:
+            file.write('source '+shlex.quote(env['HOME']+'/.bashrc')+'\n')
+            file.write('command_not_found_handle '+func_code+'\n\n')
+            file.write('bj '+func_code+'\n')
+            file.flush()
+            mustexit = subprocess.call(('bash', '--rcfile', file.name), env=env)
     os.kill(os.getpid(), signal.SIGINT)
 
 def io_client(port, auth_token, cmd):
