@@ -95,15 +95,15 @@ class CodeForces(Backend):
             for i in sp[1:]:
                 ans.append(i.split('"', 1)[0])
             return [bjtypes.task_t(i, j, None) for i, j in enumerate(ans[::2])]
-        return [bjtypes.task_t(i, j, None) for i, j in enumerate(ans[::2])]
+        return [bjtypes.task_t(i, j, None) for i, j in enumerate(q)]
     def submissions(self):
         data = self._get_submissions()[0]
         return [bjtypes.submission_t(
             i[0],
             i[1]['status-small'].split('<a href="', 1)[1].split('"', 1)[0].rsplit('/', 1)[1],
-            self._format_total_status(j['status-cell status-small status-verdict-cell'].split('>', 1)[-1]),
+            self._format_total_status(i[1]['status-cell status-small status-verdict-cell'].split('>', 1)[-1]),
             None,
-            self._get_oktests(j['status-cell status-small status-verdict-cell'].split('>', 1)[-1])
+            self._get_oktests(i[1]['status-cell status-small status-verdict-cell'].split('>', 1)[-1])
         ) for i in data]
     @staticmethod
     def _format_status(st):
@@ -116,14 +116,21 @@ class CodeForces(Backend):
         v = v[0]+''.join(i.split('>', 1)[1] for i in v[1:])
         v = v.split(' on test ', 1)[0]
         v = v.split(' on pretest ', 1)[0]
+        v = v.split('&nbsp;(', 1)[0]
         v = v.strip()
         return 'OK' if v == 'Accepted' else v
     @staticmethod
     def _get_oktests(st):
         v = st.split('<')
         v = v[0]+''.join(i.split('>', 1)[1] for i in v[1:])
-        v = v.split(' on test ', 1)[1]
-        v = v.split(' on pretest ', 1)[1]
+        v = v.split(' on test ', 1)[-1]
+        v = v.split(' on pretest ', 1)[-1]
+        q = v.split('&nbsp;(')
+        if len(q) == 2:
+            q[-1] = q[-1].strip()
+            assert q[-1].endswith(')')
+            try: return int(q[-1][:-1])
+            except ValueError: pass
         v = v.strip()
         try: return int(v) - 1
         except ValueError: return None
@@ -164,11 +171,11 @@ class CodeForces(Backend):
         except urllib.request.URLError: pass
     def submit_solution(self, task, lang, text):
         tasks, langs, csrf = self._get_submit()
-        self._submit(task, lang, text, csrf)
+        self._submit(tasks[task], lang, text, csrf)
         with self.cache_lock: self.stop_caching()
     def status(self):
         subms = self._get_submissions()[0]
-        ans = {i: None for i, j in self.tasks()}
+        ans = {j: None for i, j, k in self.tasks()}
         for i, j in subms:
             task = j['status-small'].split('<a href="', 1)[1].split('"', 1)[0].rsplit('/', 1)[1]
             status = self._format_total_status(j['status-cell status-small status-verdict-cell'].split('>', 1)[-1])
