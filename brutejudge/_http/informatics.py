@@ -28,7 +28,7 @@ class Informatics(Ejudge):
                     for vt in (('', ''), ('', '3'), ('moodle/', ''), ('moodle/', '3')):
                         if url.startswith('%s://old.informatics.%s.ru/%smod/statements/view%s.php?'%((proto, domain)+vt)):
                             if not vt[1]:
-                                url = url.replace('view', 'view3', 1)
+                                url = url.replace('view3', 'view', 1)
                             if vt[0]:
                                 url = url.replace('/moodle/', '/', 1)
                             break
@@ -43,6 +43,7 @@ class Informatics(Ejudge):
             raise BruteError("Not an old.informatics.msk.ru URL")
         self.url = url
         self.opener = OpenerWrapper(urllib.request.build_opener(urllib.request.HTTPCookieProcessor))
+        self.opener.addheaders = [('User-Agent', 'brutejudge')]
         self.opener.open("https://old.informatics.msk.ru/")
         req = self.opener.open("https://old.informatics.msk.ru/login/index.php", urllib.parse.urlencode({
             'username': login,
@@ -54,7 +55,7 @@ class Informatics(Ejudge):
         self.registered = False
         data = self.opener.open(url).read().decode('utf-8', 'replace')
         query = dict(tuple(i.split('=', 1)) for i in url.split('#', 1)[0].split('?', 1)[1].split('&'))
-        if 'id' in query and '<form action="view3.php?id='+query['id']+'&register=1" method="post">' in data:
+        if 'id' in query and '<form action="view.php?id='+query['id']+'&register=1" method="post">' in data:
             return
         self._init_full(data)
     def _init_full(self, data=None):
@@ -68,7 +69,7 @@ class Informatics(Ejudge):
             data = data.split('<div class="statements_toc_alpha"><font size="-1"><ul>', 1)[1].split('</ul>', 1)[0]
             for i in data.split('<li>')[1:]:
                 i = i.split('</li>', 1)[0]
-                if i.startswith('<a href="view3.php?'):
+                if i.startswith('<a href="view.php?'):
                     tasks.append(int(i.split('chapterid=', 1)[1].split('"', 1)[0].split('&', 1)[0]))
                 else:
                     tasks.append(cur_task)
@@ -113,13 +114,17 @@ class Informatics(Ejudge):
                 if int(task_id) in self.task_list: subms_partial.append([si, task_id, status, score, oktests])
             else: continue
             break
-        idx = -len(self.subm_list)-len(subms)
-        for a, b, c, d, e in subms:
+        idx = -len(self.subm_list)-1
+        max_subm = -1
+        for a, b, c, d, e in reversed(subms):
+            if c[1] < 0: break
             self.subm_set[a] = idx
-            idx += 1
-        self.subm_list[:0] = subms
-        self.subm_list_partial[:0] = subms_partial
-        return [bjtypes.submission_t(i, j, k[0], l, m) for i, j, k, l, m in self.subm_list_partial]
+            idx -= 1
+            max_subm = max(max_subm, a)
+        slp = subms_partial + self.subm_list_partial
+        self.subm_list[:0] = (i for i in subms if i[0] <= max_subm)
+        self.subm_list_partial[:0] = (i for i in subms_partial if i[0] <= max_subm)
+        return [bjtypes.submission_t(i, j, k[0], l, m) for i, j, k, l, m in slp]
     def submission_protocol(self, id):
         data = self._request_json("/py/protocol/get/%d"%int(id)).get('tests', {})
         ans = []
@@ -136,7 +141,7 @@ class Informatics(Ejudge):
             WT='Wall time limit exceeded',
             SK='Skipped'
         )
-        return [bjtypes.test_t(status_codes[data[str(k)]['status']], {'time_usage': data[str(k)]['time']/1000, 'memory_usage': data[str(k)]['max_memory_used']}) for k in sorted(map(int, data))]
+        return [bjtypes.test_t(status_codes[data[str(k)]['status']], {'time_usage': data[str(k)]['time']/1000, 'memory_usage': int(data[str(k)]['max_memory_used'])}) for k in sorted(map(int, data))]
     def submit_solution(self, task, lang, text):
         if not self.registered: return
         if isinstance(text, str): text = text.encode('utf-8')
@@ -180,7 +185,8 @@ class Informatics(Ejudge):
             98: ('Compiling...', -1),
             96: ('Running...', -1),
             1: ('Compilation error', 0),
-            7: ('Partial solution', 1)
+            7: ('Partial solution', 1),
+            377: ('In queue', -1),
         }
         status = obj['ejudge_status']
         return statuses.get(status, ('Unknown status #%d'%status, 0))
@@ -192,15 +198,15 @@ class Informatics(Ejudge):
             if self.registered: return False
             data = self.opener.open(self.url).read().decode('utf-8', 'replace')
             query = dict(tuple(i.split('=', 1)) for i in self.url.split('#', 1)[0].split('?', 1)[1].split('&'))
-            if 'id' not in query or '<form action="view3.php?id='+query['id']+'&register=1" method="post">' not in data:
+            if 'id' not in query or '<form action="view.php?id='+query['id']+'&register=1" method="post">' not in data:
                 return False
-            data = self.opener.open('https://old.informatics.msk.ru/mod/statements/view3.php?id='+query['id']+'&register=1', b'').read().decode('utf-8', 'replace')
-            if '<script type="text/javascript">\n//<![CDATA[\n\n  function redirect() {\n      document.location.replace(\'view3.php?id='+query['id']+'\');\n  }\n  setTimeout("redirect()", 3000);\n//]]>\n</script>' not in data: return False
+            data = self.opener.open('https://old.informatics.msk.ru/mod/statements/view.php?id='+query['id']+'&register=1', b'').read().decode('utf-8', 'replace')
+            if '<script type="text/javascript">\n//<![CDATA[\n\n  function redirect() {\n      document.location.replace(\'view.php?id='+query['id']+'\');\n  }\n  setTimeout("redirect()", 3000);\n//]]>\n</script>' not in data: return False
             self._init_full()
         raise BruteError("NYI")
     def compiler_list(self, prob_id):
         known_compilers = {1: 'fpc', 2: 'gcc', 3: 'g++', 22: 'php', 23: 'python', 24: 'perl', 25: 'mcs', 26: 'ruby', 27: 'python3'}
-        data = self._cache_get("/mod/statements/view3.php?chapterid=%d"%prob_id).decode('utf-8', 'replace')
+        data = self._cache_get("/mod/statements/view.php?chapterid=%d"%prob_id).decode('utf-8', 'replace')
         ans = []
         for i in data.split('<select name="lang_id" id="lang_id" ', 1)[1].split('>', 1)[1].split('</select>', 1)[0].replace('<option value="', "<option value='").split("<option value='")[1:]:
             a = int(i.split("'", 1)[0].split('"', 1)[0])
@@ -221,11 +227,11 @@ class Informatics(Ejudge):
             ans['tests']['fail'] = ans['tests']['total'] - ans['tests']['success']
         return (ans, None)
     def _submission_score(self, data):
-        return data['ejudge_score'] if data['ejudge_score'] >= 0 else None
+        return data['ejudge_score'] if data['ejudge_score'] != None and data['ejudge_score'] >= 0 else None
     def contest_info(self):
         return ('', {}, {})
     def problem_info(self, id):
-        url = "/mod/statements/view3.php?chapterid=%d"%id
+        url = "/mod/statements/view.php?chapterid=%d"%id
         data = self._cache_get(url).decode('utf-8', 'replace')
         if '<div class="legend">' in data: the_html = data.split('<div class="legend">', 1)[1]
         elif '<div class="statements_content">' in data:
