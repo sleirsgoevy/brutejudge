@@ -84,6 +84,8 @@ backslashes['cdot'] = backslashes['middot']
 backslashes['rightarrow'] = '\u2192'
 backslashes['bmod'] = ' mod '
 backslashes['operatorname'] = ''
+backslashes['geq'] = backslashes['ge']
+backslashes['leq'] = backslashes['le']
 
 def fn_underline(s, bm, i):
     q, i = peek(s, bm, i)
