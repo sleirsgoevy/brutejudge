@@ -243,6 +243,7 @@ class CodeForces(Backend):
         task = self.tasks()[prob_id][1]
         data = self.opener.open(self.base_url+'/problem/'+task).read().decode('utf-8', 'replace')
         data = data.split('<div class="property-title">', 1)[1].split('</div><div>', 1)[1]
+        data = data.split('<script>')[0]
         data = data.split('<script type="text/javascript">', 1)[0]
         return ({}, html2md.html2md(data, None, self.base_url+'/problems/'+task))
     def download_file(self, *args):
