@@ -42,8 +42,8 @@ change_password     missing                inherit missing inherit     missing  
 clar_list           missing                inherit missing stub        stub       missing OK      OK     
 compile_error       OK                     OK      OK      OK          OK         OK      OK      OK     
 compiler_list       OK                     OK      OK      OK          OK         OK      OK      OK     
-contest_info        missing                OK      OK      OK          missing    OK      OK      OK     
-contest_list        OK                     inherit OK      inherit     inherit    OK      inherit OK     
+contest_info        missing                OK      OK      OK          OK         OK      OK      OK     
+contest_list        OK                     inherit OK      inherit     OK         OK      inherit OK     
 detect              OK                     OK      OK      OK          OK         OK      OK      OK     
 do_action           OK                     inherit missing OK          missing    stub    stub    OK     
 download_file       missing                inherit missing stub        stub       missing stub    OK     

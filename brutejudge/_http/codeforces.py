@@ -1,4 +1,4 @@
-import urllib.request, urllib.parse, html, json
+import urllib.request, urllib.parse, html, json, time
 from brutejudge._http.base import Backend
 from brutejudge.error import BruteError
 from brutejudge._http.openerwr import OpenerWrapper
@@ -9,12 +9,14 @@ class CodeForces(Backend):
     @staticmethod
     def detect(url):
         url = url.split('/')
-        return url[:2] == ['https:', ''] and ('.'+url[2]).endswith('.codeforces.com') and url[3] in ('contest', 'contests')
+        return url[0] in ('http:', 'https:') and not url[1] and ('.'+url[2]).endswith('.codeforces.com') and url[3] in ('contest', 'contests')
     @staticmethod
     def _get_csrf(data):
         return data.split('<meta name="X-Csrf-Token" content="', 1)[1].split('"', 1)[0]
     def __init__(self, url, login, password):
         Backend.__init__(self)
+        if url.startswith('http:'):
+            url = 'https:' + url[5:]
         if url.find('/contest') == url.find('/contests'):
             url = '/contest'.join(url.split('/contests', 1))
         self.base_url = url
@@ -234,11 +236,53 @@ class CodeForces(Backend):
             ans['tests'] = {'total': ntests}
             success = 0
             for i in range(ntests):
-                if ans.get('verdict#'+str(i+1), None) == 'OK':
+                if subm.get('verdict#'+str(i+1), None) == 'OK':
                     success += 1
             ans['success'] = success
             ans['fail'] = ntests - success
         return (ans, None)
+    def contest_info(self):
+        ans = {}
+        data = self.opener.open(self.base_url.replace('/contest/', '/contests/')).read().decode('utf-8', 'replace')
+        data = data.split('<span class="format-time"', 1)[1].split('>', 1)[1].strip()
+        date = data.split('<', 1)[0] # dd.mm.yyyy hh:mm, Mmm/dd/yyyy hh:mm for English locale!!!
+        duration = data.split('</span>\r\n                </a>\r\n    </td>\r\n    <td>', 1)[1].split('<', 1)[0].strip() # hh:mm
+        q1 = {'Start': date, 'Length': duration}
+        if ' class="countdown">' in data:
+            countdown = data.split(' class="countdown">', 1)[1].split('<', 1)[0].strip() # hh:mm:ss
+            q1['Time left'] = countdown
+        else:
+            countdown = None
+        q2 = {}
+        dur = 0
+        assert duration.count(':') == 1
+        for i in map(int, duration.split(':')):
+            dur = 60 * dur + i
+        dur *= 60
+        if countdown is None:
+            left = None
+        else:
+            left = 0
+            assert count.count(':') == 1
+            for i in map(int, countdown.split(':')):
+                left = 60 * left + i
+        date, tm = date.split()
+        h, m = map(int, tm.split(':'))
+        if '/' in date:
+            mt, d, y = date.split('/')
+            d = int(d)
+            y = int(y)
+            mt = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].index(mt) + 1
+        else:
+            d, mt, y = map(int, date.split('.'))
+        start = time.mktime((y, mt, d, h, m, 0, -1, -1, -1))
+        q2['contest_start'] = start
+        q2['contest_duration'] = dur
+        q2['contest_end'] = start + dur
+        if left is not None:
+            q2['contest_time'] = dur - left
+            q2['server_time'] = start + (dur - left)
+        return '', q1, q2
     def problem_info(self, prob_id):
         task = self.tasks()[prob_id][1]
         data = self.opener.open(self.base_url+'/problem/'+task).read().decode('utf-8', 'replace')
@@ -274,3 +318,18 @@ class CodeForces(Backend):
         self._gs_cache = None
         self._st_cache = None
         self._subms_cache.clear()
+    def contest_list(self):
+        if isinstance(self, str):
+            opener = urllib.request.build_opener()
+        else:
+            opener = self.opener
+            self = 'https://codeforces.com/contests'
+        if self.startswith('http:'): self = 'https:' + self[5:]
+        data = opener.open(self).read().decode('utf-8').split('<tr\r\n    \r\n    data-contestId="')
+        ans = []
+        for i in data[1:]:
+            cid, name = i.split('"', 1)
+            cid = int(cid)
+            name = html.unescape(name.split('<td>', 1)[1].split('<br/>', 1)[0].split('</td>', 1)[0].strip())
+            ans.append((name, 'https://codeforces.com/contest/'+str(cid), {}))
+        return ans

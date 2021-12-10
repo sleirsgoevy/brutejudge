@@ -9,10 +9,15 @@ def split_tex(data):
         if j < 0:
             yield ('normal', data[i:])
             return
-        elif j and data[j-1] == '\\':
-            yield ('normal', data[i:j-1]+'$')
-            i = j + 1
         else:
+            if j and data[j-1] == '\\':
+                k = j
+                while k and data[k-1] == '\\':
+                    k -= 1
+                if (j - k) % 2:
+                    yield data[:k] + '\\'*((j - k)//2) + '$'
+                    i = j + 1
+                    continue
             yield ('normal', data[i:j])
             i = j
             while j < len(data) and data[j] == '$':
@@ -20,18 +25,34 @@ def split_tex(data):
             if j == len(data):
                 yield ('normal', data[i:j])
                 return
-            ss = data[i:j]
+            ss = j-i
             i = j
-            j = data.find(ss, i)
-            if j < 0:
-                yield ('normal', ss+data[i:])
+            brlevel = 0
+            ss1 = 0
+            while j < len(data) and (brlevel or ss1 < ss):
+                if data[j] == '\\':
+                    ss1 = 0
+                    j += 2
+                    continue
+                elif data[j] == '$':
+                    ss1 += 1
+                    j += 1
+                else:
+                    ss1 = 0
+                    if data[j] == '{':
+                        brlevel += 1
+                    elif data[j] == '}':
+                        brlevel -= 1
+                    j += 1
+            if brlevel or ss1 < ss:
+                yield ('normal', '$'*ss+data[i:])
                 return
             elif max(map(ord, data[i:j])) >= 128:
-                yield ('normal', ss+data[i:j]+ss)
-                i = j + len(ss)
+                yield ('normal', '$'*ss+data[i:j])
+                i = j
             else:
-                yield ('tex', data[i:j])
-                i = j + len(ss)
+                yield ('tex', data[i:j-ss])
+                i = j
 
 def brmap(s):
     it = iter(enumerate(s))
@@ -78,14 +99,25 @@ def match(s, bm, i, what):
         return None, i0
     return ans, i
 
+def peek(s, bm, i):
+    if s[i] == '{' and i in bm:
+        return s[i+1:bm[i]], bm[i]+1
+    return s[i], i+1
+
 backslashes = {k: chr(v) for k, v in html.entities.name2codepoint.items()}
-backslashes['ldots'] = backslashes['hellip']
+backslashes['dots'] = '...'
+backslashes['ldots'] = '...'
 backslashes['cdot'] = backslashes['middot']
 backslashes['rightarrow'] = '\u2192'
 backslashes['bmod'] = ' mod '
 backslashes['operatorname'] = ''
 backslashes['geq'] = backslashes['ge']
 backslashes['leq'] = backslashes['le']
+backslashes['neq'] = backslashes['ne']
+backslashes['nless'] = '\u226e'
+backslashes['ngtr'] = '\u226f'
+backslashes['nleq'] = '\u2270'
+backslashes['ngeq'] = '\u2271'
 
 def fn_underline(s, bm, i):
     q, i = peek(s, bm, i)
@@ -100,10 +132,31 @@ def fn_limits(s, bm, i):
     return '[from ' + untex_expr(q[0]) + ' to ' + untex_expr(q[1]) + ']', i
 backslashes['limits'] = fn_limits
 
-def peek(s, bm, i):
-    if s[i] == '{' and i in bm:
-        return s[i+1:bm[i]], bm[i]+1
-    return s[i], i+1
+def fn_text(s, bm, i):
+    s, i = peek(s, bm, i)
+    return untex(s), i
+backslashes['text'] = fn_text
+backslashes['mathrm'] = peek
+
+def fn_xrightarrow(s, bm, i):
+    args = []
+    if s[i] == '[':
+        j = s.find(']', i+1)
+        if j >= 0:
+            args.append(untex_expr(s[i+1:j]))
+            i = j + 1
+    ss, i = peek(s, bm, i)
+    args.append(untex_expr(ss))
+    return '\u2192 ['+', '.join(args)+']', i
+backslashes['xrightarrow'] = fn_xrightarrow
+
+def fn_frac(s, bm, i):
+    q, i = match(s, bm, i, '{{')
+    if q is None:
+        return '', i
+    return '('+untex_expr(q[0])+')/('+untex_expr(q[1])+')', i
+backslashes['frac'] = fn_frac
+backslashes['dfrac'] = fn_frac
 
 def untex_expr(s):
     bm = brmap(s)
