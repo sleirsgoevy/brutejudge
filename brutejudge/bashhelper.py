@@ -281,8 +281,10 @@ def io_client(port, auth_token, cmd):
                         continue
                     data = b''
                     while len(data) < l: data += sock.recv(l - len(data))
-                    if where == 'stdout': sys.stdout.buffer.raw.write(data)
-                    else: sys.stderr.buffer.raw.write(data)
+                    try:
+                        if where == 'stdout': sys.stdout.buffer.raw.write(data)
+                        else: sys.stderr.buffer.raw.write(data)
+                    except IOError: pass
             else: continue
             break
     finally:

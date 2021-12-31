@@ -48,11 +48,13 @@ detect              OK                     OK      OK      OK          OK       
 do_action           OK                     inherit missing OK          missing    stub    stub    OK     
 download_file       missing                inherit missing stub        stub       missing stub    OK     
 get_samples         missing                OK      OK      stub        OK         missing missing OK     
+locales             missing                missing missing missing     OK         missing missing missing
 login_type          OK                     inherit OK      inherit     inherit    OK      inherit inherit
 problem_info        OK                     inherit missing OK          OK         OK      OK      OK     
 read_clar           OK                     inherit missing stub        stub       missing OK      OK     
 scoreboard          missing                inherit OK      stub        OK         missing OK      OK     
 scores              missing                OK      OK      OK          OK         OK      OK      OK     
+set_locale          missing                missing missing missing     OK         missing missing missing
 status              missing                OK      OK      OK          OK         OK      OK      OK     
 stop_caching        missing                inherit OK      OK          OK         OK      OK      OK     
 submission_protocol OK                     OK      OK      OK          OK         OK      OK      OK     

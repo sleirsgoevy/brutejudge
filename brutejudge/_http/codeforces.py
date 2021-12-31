@@ -15,6 +15,9 @@ class CodeForces(Backend):
         return data.split('<meta name="X-Csrf-Token" content="', 1)[1].split('"', 1)[0]
     def __init__(self, url, login, password):
         Backend.__init__(self)
+        self.locale = 'en'
+        if '#locale=' in url:
+            url, self.locale = url.rsplit('#locale=', 1)
         if url.startswith('http:'):
             url = 'https:' + url[5:]
         if url.find('/contest') == url.find('/contests'):
@@ -38,8 +41,8 @@ class CodeForces(Backend):
         self._st_cache = None
         self._subms_cache = {}
     def _get_submit(self):
-        data = self.opener.open(self.base_url+'/submit')
-        if data.geturl() != self.base_url+'/submit':
+        data = self.opener.open(self.base_url+'/submit?locale=en')
+        if data.geturl() not in (self.base_url+'/submit', self.base_url+'/submit?locale=en'):
             return [], [], None
         data = data.read().decode('utf-8', 'replace')
         csrf = self._get_csrf(data)
@@ -55,8 +58,8 @@ class CodeForces(Backend):
     def _get_submissions(self):
         with self.cache_lock:
             if self._gs_cache != None: return self._gs_cache
-        data = self.opener.open(self.base_url+'/my')
-        if data.geturl() != self.base_url+'/my':
+        data = self.opener.open(self.base_url+'/my?locale=en')
+        if data.geturl() not in (self.base_url+'/my', self.base_url+'/my?locale=en'):
             raise BruteError("Failed to fetch submission list")
         data = data.read().decode('utf-8', 'replace')
         csrf = self._get_csrf(data)
@@ -91,12 +94,12 @@ class CodeForces(Backend):
         if not q:
             data = self.opener.open(self.base_url).read().decode('utf-8')
             ans = []
-            sp = data.split('<a href="'+self.base_url.rsplit('codeforces.com', 1)[1]+'/problem/')
+            sp = data.split('<td class="id">\r\n                        <a href="'+self.base_url.rsplit('codeforces.com', 1)[1]+'/problem/')
             if sp[0].rfind('<') > sp[0].rfind('>'):
                 return ans
             for i in sp[1:]:
                 ans.append(i.split('"', 1)[0])
-            return [bjtypes.task_t(i, j, None) for i, j in enumerate(ans[::2])]
+            return [bjtypes.task_t(i, j, None) for i, j in enumerate(ans)]
         return [bjtypes.task_t(i, j, None) for i, j in enumerate(q)]
     def submissions(self):
         data = self._get_submissions()[0]
@@ -187,7 +190,7 @@ class CodeForces(Backend):
     def scores(self):
         with self.cache_lock: data = self._st_cache
         if data == None:
-            data = self.opener.open(self.base_url+'/standings').read().decode('utf-8', 'replace')
+            data = self.opener.open(self.base_url+'/standings?locale=en').read().decode('utf-8', 'replace')
             with self.cache_lock:
                 if self.caching: self._st_cache = data
         tasks = (i.split('href="/contest/', 1)[1].split('"', 1)[0].rsplit('/', 1)[1] for i in data.split('<th ')[5:])
@@ -243,7 +246,7 @@ class CodeForces(Backend):
         return (ans, None)
     def contest_info(self):
         ans = {}
-        data = self.opener.open(self.base_url.replace('/contest/', '/contests/')).read().decode('utf-8', 'replace')
+        data = self.opener.open(self.base_url.replace('/contest/', '/contests/')+'?locale=en').read().decode('utf-8', 'replace')
         data = data.split('<span class="format-time"', 1)[1].split('>', 1)[1].strip()
         date = data.split('<', 1)[0] # dd.mm.yyyy hh:mm, Mmm/dd/yyyy hh:mm for English locale!!!
         duration = data.split('</span>\r\n                </a>\r\n    </td>\r\n    <td>', 1)[1].split('<', 1)[0].strip() # hh:mm
@@ -263,7 +266,7 @@ class CodeForces(Backend):
             left = None
         else:
             left = 0
-            assert count.count(':') == 1
+            assert countdown.count(':') == 2
             for i in map(int, countdown.split(':')):
                 left = 60 * left + i
         date, tm = date.split()
@@ -285,11 +288,11 @@ class CodeForces(Backend):
         return '', q1, q2
     def problem_info(self, prob_id):
         task = self.tasks()[prob_id][1]
-        data = self.opener.open(self.base_url+'/problem/'+task).read().decode('utf-8', 'replace')
+        data = self.opener.open(self.base_url+'/problem/'+task+'?locale='+self.locale).read().decode('utf-8', 'replace')
         data = data.split('<div class="property-title">', 1)[1].split('</div><div>', 1)[1]
         data = data.split('<script>')[0]
         data = data.split('<script type="text/javascript">', 1)[0]
-        return ({}, html2md.html2md(data, None, self.base_url+'/problems/'+task))
+        return ({}, html2md.html2md(data, None, self.base_url+'/problems/'+task+'?locale='+self.locale))
     def download_file(self, *args):
         raise BruteError("File download doesn't exist on CodeForces")
     def clar_list(self):
@@ -333,3 +336,7 @@ class CodeForces(Backend):
             name = html.unescape(name.split('<td>', 1)[1].split('<br/>', 1)[0].split('</td>', 1)[0].strip())
             ans.append((name, 'https://codeforces.com/contest/'+str(cid), {}))
         return ans
+    def locales(self):
+        return [('en', 'English'), ('ru', 'Russian')]
+    def set_locale(self, which):
+        self.locale = which

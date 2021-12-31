@@ -116,8 +116,8 @@ class BruteCMD(cmd.Cmd):
         sp = cmd.split()
         if len(sp) != 3:
             return self.do_help('submit')
-        tasks = tasks(self.url, self.cookie)
-        try: task_id = next(i.id for i in tasks if i.short_name == sp[0])
+        task_list = tasks(self.url, self.cookie)
+        try: task_id = next(i.id for i in task_list if i.short_name == sp[0])
         except StopIteration:
             raise BruteError("No such task.")
         if not sp[1].isnumeric():

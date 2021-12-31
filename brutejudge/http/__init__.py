@@ -25,7 +25,7 @@ def _create_wrapper(name):
         return getattr(args[0], name)(*args[2:], **kwds)
     globals()[name] = func
 
-for _w in ['tasks', 'submissions', 'submission_protocol', 'task_ids', 'submit_solution', 'status', 'scores', 'compile_error', 'submission_source', 'do_action', 'compiler_list', 'submission_stats', 'contest_info', 'problem_info', 'download_file', 'clar_list', 'submit_clar', 'read_clar', 'get_samples', 'may_cache', 'scoreboard', 'change_password']:
+for _w in ['tasks', 'submissions', 'submission_protocol', 'task_ids', 'submit_solution', 'status', 'scores', 'compile_error', 'submission_source', 'do_action', 'compiler_list', 'submission_stats', 'contest_info', 'problem_info', 'download_file', 'clar_list', 'submit_clar', 'read_clar', 'get_samples', 'may_cache', 'scoreboard', 'change_password', 'locales', 'set_locale']:
     _create_wrapper(_w)
 
 del _create_wrapper, _w
