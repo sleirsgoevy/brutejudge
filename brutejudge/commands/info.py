@@ -158,6 +158,21 @@ def fn_frac(s, bm, i):
 backslashes['frac'] = fn_frac
 backslashes['dfrac'] = fn_frac
 
+def fn_not(s, bm, i):
+    q, i = match(s, bm, i, '{')
+    if q is None:
+        return chr(824), i
+    return chr(824)+untex_expr(q[0]).lstrip(), i
+backslashes['not'] = fn_not
+
+def fn_pmod(s, bm, i):
+    q, i = match(s, bm, i, '{')
+    if q is None:
+        return '(mod)', i
+    return '(mod '+untex_expr(q[0])+')', i
+backslashes['pmod'] = fn_pmod
+backslashes['enspace'] = '  '
+
 def untex_expr(s):
     bm = brmap(s)
     ans = ''

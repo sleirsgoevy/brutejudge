@@ -278,7 +278,7 @@ class CodeForces(Backend):
             mt = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].index(mt) + 1
         else:
             d, mt, y = map(int, date.split('.'))
-        start = time.mktime((y, mt, d, h, m, 0, -1, -1, -1))
+        start = int(time.mktime((y, mt, d, h, m, 0, -1, -1, -1)))
         q2['contest_start'] = start
         q2['contest_duration'] = dur
         q2['contest_end'] = start + dur
