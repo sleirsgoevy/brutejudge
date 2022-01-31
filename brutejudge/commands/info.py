@@ -172,6 +172,8 @@ def fn_pmod(s, bm, i):
     return '(mod '+untex_expr(q[0])+')', i
 backslashes['pmod'] = fn_pmod
 backslashes['enspace'] = '  '
+backslashes['left'] = ''
+backslashes['right'] = ''
 
 def untex_expr(s):
     bm = brmap(s)

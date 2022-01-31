@@ -75,4 +75,6 @@ class AggressiveCacheBackend:
         else:
             return self.parent.contest_list()
     def __getattr__(self, attr):
+        if attr == 'parent':
+            raise AttributeError(attr)
         return getattr(self.parent, attr)
