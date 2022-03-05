@@ -107,6 +107,7 @@ def peek(s, bm, i):
 backslashes = {k: chr(v) for k, v in html.entities.name2codepoint.items()}
 backslashes['dots'] = '...'
 backslashes['ldots'] = '...'
+backslashes['cdots'] = '...'
 backslashes['cdot'] = backslashes['middot']
 backslashes['rightarrow'] = '\u2192'
 backslashes['bmod'] = ' mod '
