@@ -111,7 +111,10 @@ backslashes['cdots'] = '...'
 backslashes['cdot'] = backslashes['middot']
 backslashes['rightarrow'] = '\u2192'
 backslashes['bmod'] = ' mod '
+backslashes['min'] = 'min'
+backslashes['max'] = 'max'
 backslashes['operatorname'] = ''
+backslashes['mathbf'] = ''
 backslashes['geq'] = backslashes['ge']
 backslashes['leq'] = backslashes['le']
 backslashes['neq'] = backslashes['ne']
@@ -119,6 +122,7 @@ backslashes['nless'] = '\u226e'
 backslashes['ngtr'] = '\u226f'
 backslashes['nleq'] = '\u2270'
 backslashes['ngeq'] = '\u2271'
+backslashes['ell'] = 'l'
 
 def fn_underline(s, bm, i):
     q, i = peek(s, bm, i)

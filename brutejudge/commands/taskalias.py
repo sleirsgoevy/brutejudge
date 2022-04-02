@@ -17,7 +17,16 @@ class TaskAlias:
     def scores(self):
         return collections.OrderedDict((self.taskalias_k2v.get(k, k), v) for k, v in self.parent.scores().items())
     def __getattr__(self, attr):
-        return getattr(self.parent, attr)
+        ans = getattr(self.parent, attr)
+        return ans
+    @classmethod
+    def _from_pickled(self, parent, taskalias_k2v, taskalias_v2k):
+        ans = self(parent)
+        ans.taskalias_k2v = taskalias_k2v
+        ans.taskalias_v2k = taskalias_v2k
+        return ans
+    def __reduce__(self):
+        return (self._from_pickled, (self.parent, self.taskalias_k2v, self.taskalias_v2k))
 
 def do_taskalias(self, cmd):
     """
