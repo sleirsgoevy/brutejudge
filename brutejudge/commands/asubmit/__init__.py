@@ -1,4 +1,4 @@
-from brutejudge.http import submit_solution, tasks, submissions, compiler_list, may_cache
+from brutejudge.http import submit_solution, tasks, submissions, compiler_list, may_cache, compile_error
 from brutejudge.error import BruteError
 import os.path, shlex, sys
 
@@ -18,7 +18,7 @@ def check_exists(fname, options=set()):
 
 def do_asubmit(self, cmd, *, afmt=False):
     """
-    usage: asubmit [-w] [-x <extension>] <task> <lang_id> <file>
+    usage: asubmit [-w] [-e] [-x <extension>] <task> <lang_id> <file>
 
     Submit a new solution, using style-fixed version.
     Uses a specific style fixer if -x is specified.
@@ -26,11 +26,16 @@ def do_asubmit(self, cmd, *, afmt=False):
     """
     modname = ''
     wait = False
+    show_error = False
     sp = shlex.split(cmd)
     if len(sp) not in (range(3, 7) if not afmt else (1, 3)):
         return self.do_help('aformat' if afmt else 'asubmit')
     if not afmt and sp[0] == '-w':
         wait = True
+        del sp[0]
+    if not afmt and sp[0] == '-e':
+        wait = True
+        show_error = True
         del sp[0]
     if len(sp) not in ((3, 5) if not afmt else (1, 3)):
         return self.do_help('aformat' if afmt else 'asubmit')
@@ -82,4 +87,7 @@ def do_asubmit(self, cmd, *, afmt=False):
         raise BruteError("Error while sending.")
     else:
         print('Submission ID is', after[0].id)
-        if wait: self.do_astatus(str(after[0].id))
+        if wait:
+            self.do_astatus(str(after[0].id))
+            if show_error:
+                print(compile_error(self.url, self.cookie, after[0].id))

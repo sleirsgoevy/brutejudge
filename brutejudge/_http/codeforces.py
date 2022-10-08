@@ -26,17 +26,18 @@ class CodeForces(Backend):
         self.handle = login
         self.host = url.split('/')[2]
         self.opener = OpenerWrapper(urllib.request.build_opener(urllib.request.HTTPCookieProcessor))
-        csrf = self._get_csrf(self.opener.open('https://%s/enter?back=%%2F'%self.host).read().decode('utf-8', 'replace'))
-        ln = self.opener.open('https://%s/enter?back=%%2F'%self.host, urllib.parse.urlencode({
-            'csrf_token': csrf,
-            'action': 'enter',
-            'ftaa': '',
-            'bfaa': '',
-            'handleOrEmail': login,
-            'password': password
-        }).encode('ascii'))
-        if ln.geturl() != 'https://%s/'%self.host:
-            raise BruteError("Login failed.")
+        if login != None or password != None:
+            csrf = self._get_csrf(self.opener.open('https://%s/enter?back=%%2F'%self.host).read().decode('utf-8', 'replace'))
+            ln = self.opener.open('https://%s/enter?back=%%2F'%self.host, urllib.parse.urlencode({
+                'csrf_token': csrf,
+                'action': 'enter',
+                'ftaa': '',
+                'bfaa': '',
+                'handleOrEmail': login,
+                'password': password
+            }).encode('ascii'))
+            if ln.geturl() != 'https://%s/'%self.host:
+                raise BruteError("Login failed.")
         self._gs_cache = None
         self._st_cache = None
         self._subms_cache = {}
@@ -101,15 +102,31 @@ class CodeForces(Backend):
                 ans.append(i.split('"', 1)[0])
             return [bjtypes.task_t(i, j, None) for i, j in enumerate(ans)]
         return [bjtypes.task_t(i, j, None) for i, j in enumerate(q)]
-    def submissions(self):
-        data = self._get_submissions()[0]
-        return [bjtypes.submission_t(
-            i[0],
-            i[1]['status-small'].split('<a href="', 1)[1].split('"', 1)[0].rsplit('/', 1)[1],
-            self._format_total_status(i[1]['status-cell status-small status-verdict-cell'].split('>', 1)[-1]),
-            None,
-            self._get_oktests(i[1]['status-cell status-small status-verdict-cell'].split('>', 1)[-1])
-        ) for i in data]
+    def submissions(self, all=False):
+        if all:
+            contest_id = self.base_url.split('/')
+            while not contest_id[-1]: contest_id.pop()
+            contest_id = int(contest_id[-1])
+            data = json.loads(self.opener.open('https://'+self.host+'/api/contest.status?contestId=%d'%contest_id).read().decode('utf-8', 'replace'))
+            if data['status'] != 'OK':
+                raise BruteError('Failed to load submissions.')
+            return [bjtypes.submission_t(
+                i['id'],
+                i['problem']['index'],
+                self._format_status(i['verdict']),
+                None,
+                i['passedTestCount']
+            ) for i in data['result']]
+        else:
+            #TODO: use API here too
+            data = self._get_submissions()[0]
+            return [bjtypes.submission_t(
+                i[0],
+                i[1]['status-small'].split('<a href="', 1)[1].split('"', 1)[0].rsplit('/', 1)[1],
+                self._format_total_status(i[1]['status-cell status-small status-verdict-cell'].split('>', 1)[-1]),
+                None,
+                self._get_oktests(i[1]['status-cell status-small status-verdict-cell'].split('>', 1)[-1])
+            ) for i in data]
     @staticmethod
     def _format_status(st):
         if st == 'OK': return 'OK'

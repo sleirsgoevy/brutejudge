@@ -114,6 +114,7 @@ class Ejudge(Backend):
         Backend.__init__(self)
         url0 = url
         url = url.replace('/new-register?', '/new-client?')
+        url = url.replace('/ej/team?', '/ej/user?')
         contest_id = url.split("contest_id=")[1].split("&")[0]
         self.contest_id = int(contest_id)
         base_url = url.split("?")[0]

@@ -1,5 +1,5 @@
 import cmd, sys, traceback, os, shlex
-from .http import login, tasks, submissions, submission_protocol, submit_solution, status, scores, compile_error, submission_source, compiler_list, submission_stats, has_feature, contest_list
+from .http import login_type, login, tasks, submissions, submission_protocol, submit_solution, status, scores, compile_error, submission_source, compiler_list, submission_stats, has_feature, contest_list
 from .error import BruteError
 import brutejudge.commands
 
@@ -38,6 +38,19 @@ class BruteCMD(cmd.Cmd):
         import getpass
         x = getpass.getpass()
         self.url, self.cookie = login(data[0], data[1], x)
+    def do_anonlogin(self, cmd):
+        """
+        usage: anonlogin <login_page_url>
+
+        Perform an anonymous login to CMS.
+        """
+        data = cmd.split(' ')
+        if len(data) != 1:
+            return self.do_help('login')
+        url = data[0]
+        if 'pass' not in login_type(url):
+            raise BruteError("Anonymous login is not supported")
+        self.url, self.cookie = login(url, None, None)
     def do_logout(self, cmd):
         """
         usage: logout
