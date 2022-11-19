@@ -102,6 +102,7 @@ class CupsOnline(Backend):
             status = {
                 0: 'Judging',
                 2: 'Testing complete',
+                3: 'Compiling',
                 4: 'Compilation error',
             }.get(subm['state_code'], '%s (%d)'%(subm['state'], subm['state_code']))
         return status
