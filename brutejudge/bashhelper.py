@@ -332,7 +332,15 @@ class ForkingBrute:
                 with open(pipe[1], 'wb') as file: file.write(self.brute if self.unpickle_failed else pickle.dumps(self.brute))
                 sys.exit(1)
         os.close(pipe[1])
-        os.waitpid(pid, 0)
+        old = 123
+        try:
+            def new(*args):
+                os.kill(pid, signal.SIGINT)
+            old = signal.signal(signal.SIGINT, new)
+            os.waitpid(pid, 0)
+        finally:
+            if old != 123:
+                signal.signal(signal.SIGINT, old)
         with open(pipe[0], 'rb') as file: self.brute = file.read()
     def onecmd(self, cmd):
         self.execute(self.do_onecmd, cmd)

@@ -48,7 +48,7 @@ def html2md(data, dload_prefix=None, base=None):
             ans += '\n\n'+'#'*int(d[1:])+' '+do_unescape(i, is_code)
         elif i.startswith('li>'):
             ans += '* ' + do_unescape(i[3:], is_code)
-        elif any(i.startswith(x) for x in ('br>', 'br/>', '/h1>', '/h2>', '/h3>', '/h4>', '/h5>', '/h6>', '/p>', '/li>', '/div>')):
+        elif any(i.startswith(x) for x in ('br>', 'br/>', 'br />', '/h1>', '/h2>', '/h3>', '/h4>', '/h5>', '/h6>', '/p>', '/li>', '/div>')):
             ans += '\n\n' + do_unescape(i.split('>', 1)[1], is_code)
         elif i.startswith('/a>'):
             ans += ']('+hrefs.pop()+')'+do_unescape(i[3:], is_code)

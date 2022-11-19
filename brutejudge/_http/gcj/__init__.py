@@ -174,11 +174,18 @@ class GCJ(Backend):
             if int(subm['id'], 16) == subm_id: break
         else: return ({}, '')
         return self._submission_stats(data, subm)
+    @staticmethod
+    def _format_duration(q):
+        q, d = divmod(q, 60)
+        q, c = divmod(q, 60)
+        a, b = divmod(q, 24)
+        if a: return '%d:%02d:%02d:%02d'%(a, b, c, d)
+        else: return '%02d:%02d:%02d:%02d'%(b, c, d)
     def contest_info(self):
         db = self._get_dashboard("Failed to fetch contest info.")
         data1 = {'contest_start': db['challenge']['start_ms'] / 1000, 'contest_end': db['challenge']['end_ms'] / 1000}
         data1['contest_duration'] = data1['contest_end'] - data1['contest_start']
-        datas = {'Contest start time': time.ctime(data1['contest_start']), 'Duration': time.ctime(data1['contest_duration'])}
+        datas = {'Contest start time': time.ctime(data1['contest_start']), 'Duration': self._format_duration(data1['contest_duration'])}
         return ('', datas, data1)
     def problem_info(self, task):
         for i in self._get_dashboard("Failed to fetch problem info.")['challenge']['tasks']:

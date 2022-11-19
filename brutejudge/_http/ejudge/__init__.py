@@ -46,7 +46,13 @@ def do_http(url, method, headers={}, data=b''):
         if l == '': break
         k, v = l.split(': ', 1)
         resp_headers.append((_http_header_capitalize(k), v))
-    rhd = dict(resp_headers)
+    rhd = {}
+    for k, v in resp_headers:
+        if k in rhd:
+            if isinstance(rhd[k], str): rhd[k] = [rhd[k]]
+            rhd[k].append(v)
+        else:
+            rhd[k] = v
     if 'Content-Length' in rhd:
         data = b''
         while len(data) < int(rhd['Content-Length']):

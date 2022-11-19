@@ -34,6 +34,8 @@ def do_samples(self, cmd):
                     else: out_sep = True
                     (sys.stdout.buffer if 'binary' in kwargs else sys.stdout).write(data)
                     (sys.stdout.buffer if 'binary' in kwargs else sys.stdout).flush()
+                    if 'binary' not in kwargs and not data.endswith('\n'):
+                        print()
                 continue
             if what == 'Input':
                 suff = ''
