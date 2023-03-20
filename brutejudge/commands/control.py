@@ -14,10 +14,10 @@ def do_control(self, cmd):
     """
     cmd = cmd.strip()
     if cmd == 'start-virtual':
-        if not do_action(self.url, self.cookie):
+        if not do_action(self.url, self.cookie, 'start_virtual'):
             raise BruteError("Failed to start virtual contest")
     elif cmd == 'stop-virtual':
-        if not do_action(self.url, self.cookie):
+        if not do_action(self.url, self.cookie, 'stop_virtual'):
             raise BruteError("Failed to stop virtual contest")
     else:
         return self.do_help('control')

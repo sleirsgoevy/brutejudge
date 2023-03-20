@@ -149,7 +149,9 @@ This function returns the list of contestant-to-jury and jury-to-contestant mess
 
 `brutejudge.http.clar_t = collections.namedtuple('clar_t', ('id', 'subject'))`
 
-**This function has been deprecated. Use `clar_list` instead**### `submit_clar(url, cookie, task_id, subject, text)`
+**This function has been deprecated. Use `clar_list` instead**
+
+### `submit_clar(url, cookie, task_id, subject, text)`
 
 This function sends a clarification request on the specified task, with the specified subject and body. `task_id` must be as returned from `task_ids`, `subject` and `text` must be Unicode strings. An exception will be thrown if the submission fails.
 

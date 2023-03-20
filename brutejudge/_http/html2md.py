@@ -1,7 +1,7 @@
 import html, urllib.parse
 
-def do_unescape(s, code=False):
-    if code: return html.unescape(s)
+def do_unescape(s, code=None):
+    if code is not None: return html.unescape(s)
     return html.unescape(' '.join(('_'+s+'_').split()))[1:-1]
 
 def validate_tag(data):
@@ -11,7 +11,7 @@ def validate_tag(data):
     i = 0
     while i < len(data):
         j = min(data.find("'", i) % (len(data) + 1), data.find('"', i) % (len(data) + 1))
-        if not set(data[i:j]).issubset(set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- =')):
+        if not set(data[i:j]).issubset(set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- =\n')):
             return False
         if j == len(data): return True
         i = j + 1
@@ -22,9 +22,9 @@ def validate_tag(data):
     return i == len(data)
 
 def html2md(data, dload_prefix=None, base=None):
-    data = data.split('<')
+    data = ''.join(i.split('-->', 1)[1] for i in ('-->'+data).split('<!--')).split('<')
     ans = do_unescape(data[0])
-    is_code = False
+    is_code = None
     hrefs = []
     for i in data[1:]:
         if i.startswith('a href="'):
@@ -43,9 +43,9 @@ def html2md(data, dload_prefix=None, base=None):
             if dload_prefix != None and src.startswith(dload_prefix):
                 src = 'file '+src[len(dload_prefix):]
             ans += '![]('+src+')'
-        elif any(i.startswith('h%d>'%x) for x in range(1, 7)):
+        elif any(i.startswith('h%d>'%x) or i.startswith('h%d '%x) for x in range(1, 7)):
             d, i = i.split('>', 1)
-            ans += '\n\n'+'#'*int(d[1:])+' '+do_unescape(i, is_code)
+            ans += '\n\n'+'#'*int(d[1])+' '+do_unescape(i, is_code)
         elif i.startswith('li>'):
             ans += '* ' + do_unescape(i[3:], is_code)
         elif any(i.startswith(x) for x in ('br>', 'br/>', 'br />', '/h1>', '/h2>', '/h3>', '/h4>', '/h5>', '/h6>', '/p>', '/li>', '/div>')):
@@ -55,24 +55,30 @@ def html2md(data, dload_prefix=None, base=None):
         elif i.startswith('sub>') or i.startswith('sub '):
             ans += '[' + do_unescape(i.split('>', 1)[-1], is_code)
         elif i.startswith('/sub>'):
-            ans += ']' + do_unescape(i[5:], is_code)
+            ans += ']' + do_unescape(i.split('>', 1)[1], is_code)
         elif i.startswith('sup>') or i.startswith('sup '):
             ans += '**(' + do_unescape(i.split('>', 1)[-1], is_code)
         elif i.startswith('/sup>'):
             ans += ')' + do_unescape(i[5:], is_code)
         else:
             if i.startswith('/pre>'):
-                ans += '\n```'
-                is_code = False
+                if is_code == 'pre':
+                    ans += '\n```'
+                    is_code = None
             elif i.startswith('/code>'):
-                ans += '`'
-                is_code = False
+                if is_code == 'code':
+                    ans += '`'
+                    is_code = None
             elif i.startswith('pre>') or i.startswith('pre '):
-                ans += '```\n'
-                is_code = True
+                if is_code is None:
+                    ans += '```\n'
+                    is_code = 'pre'
             elif i.startswith('code>') or i.startswith('code '):
-                ans += '`'
-                is_code = True
+                if is_code is None:
+                    ans += '`'
+                    is_code = 'code'
+            if (i.startswith('p>') or i.startswith('p ')) and ans and not ans.endswith('\n'):
+                ans += '\n'
             if '>' not in i or not validate_tag(i.split('>', 1)[0]):
                 ans += '<' + do_unescape(i, is_code)
             else:
