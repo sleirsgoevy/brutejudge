@@ -1,7 +1,7 @@
 import urllib.request, urllib.parse, html, json, time
 from brutejudge._http.base import Backend
 from brutejudge.error import BruteError
-from brutejudge._http.openerwr import OpenerWrapper
+from brutejudge._http.ejudge import get, post
 import brutejudge._http.html2md as html2md
 import brutejudge._http.types as bjtypes
 
@@ -16,8 +16,14 @@ class CodeForces(Backend):
     def __init__(self, url, login, password):
         Backend.__init__(self)
         self.locale = 'en'
-        if '#locale=' in url:
-            url, self.locale = url.rsplit('#locale=', 1)
+        cf_clearance = None
+        if '#' in url:
+            url, params = url.rsplit('#', 1)
+            params = urllib.parse.parse_qs(params)
+            if 'locale' in params:
+                self.locale = params['locale'][0]
+            if 'cf_clearance' in params:
+                cf_clearance = params['cf_clearance'][0]
         if url.startswith('http:'):
             url = 'https:' + url[5:]
         if url.find('/contest') == url.find('/contests'):
@@ -25,27 +31,52 @@ class CodeForces(Backend):
         self.base_url = url
         self.handle = login
         self.host = url.split('/')[2]
-        self.opener = OpenerWrapper(urllib.request.build_opener(urllib.request.HTTPCookieProcessor))
+        cookies = {'cf_clearance': cf_clearance} if cf_clearance != None else {}
         if login != None or password != None:
-            csrf = self._get_csrf(self.opener.open('https://%s/enter?back=%%2F'%self.host).read().decode('utf-8', 'replace'))
-            ln = self.opener.open('https://%s/enter?back=%%2F'%self.host, urllib.parse.urlencode({
+            code, headers, data = get('https://%s/enter?back=%%2F'%self.host, {'Cookie': '; '.join(map('='.join, cookies.items()))} if cookies else {})
+            if code == 403:
+                raise EJError("CloudFlare is angry at you. Get a token!")
+            elif code != 200:
+                raise EJError("Error getting CSRF token for login.")
+            if 'Set-Cookie' in headers:
+                new_cookies = headers['Set-Cookie']
+                if isinstance(new_cookies, str): new_cookies = [new_cookies]
+                for i in new_cookies:
+                    k, v = i.split(';', 1)[0].strip().split('=', 1)
+                    cookies[k] = v
+            else:
+                raise EJError("No cookies received from server.")
+            self.cookie = '; '.join(map('='.join, cookies.items()))
+            csrf = self._get_csrf(data.decode('utf-8', 'replace'))
+            code, headers, data = post('https://%s/enter?back=%%2F'%self.host, {
                 'csrf_token': csrf,
                 'action': 'enter',
                 'ftaa': '',
                 'bfaa': '',
                 'handleOrEmail': login,
                 'password': password
-            }).encode('ascii'))
-            if ln.geturl() != 'https://%s/'%self.host:
+            }, {'Cookie': self.cookie, 'Content-Type': 'application/x-www-form-urlencoded'})
+            if code != 302:
                 raise BruteError("Login failed.")
+            if 'Set-Cookie' in headers:
+                new_cookies = headers['Set-Cookie']
+                if isinstance(new_cookies, str): new_cookies = [new_cookies]
+                for i in new_cookies:
+                    k, v = i.split(';', 1)[0].strip().split('=', 1)
+                    cookies[k] = v
+                self.cookie = '; '.join(map('='.join, cookies.items()))
         self._gs_cache = None
         self._st_cache = None
         self._subms_cache = {}
+    def _get(self, path, code=200):
+        if path.startswith('/'):
+            path = self.base_url + path
+        code, headers, data = get(path, {'Cookie': self.cookie})
+        if code != 200:
+            raise EJError("HTTP error %d on URL %s"%(code, path))
+        return data
     def _get_submit(self):
-        data = self.opener.open(self.base_url+'/submit?locale=en')
-        if data.geturl() not in (self.base_url+'/submit', self.base_url+'/submit?locale=en'):
-            return [], [], None
-        data = data.read().decode('utf-8', 'replace')
+        data = self._get('/submit?locale=en').decode('utf-8', 'replace')
         csrf = self._get_csrf(data)
         data1 = data.split('name="submittedProblemIndex">', 1)[1].split('</select>', 1)[0].split('<option value="')
         tasks = [i.split('"', 1)[0] for i in data1[2:]]
@@ -59,10 +90,7 @@ class CodeForces(Backend):
     def _get_submissions(self):
         with self.cache_lock:
             if self._gs_cache != None: return self._gs_cache
-        data = self.opener.open(self.base_url+'/my?locale=en')
-        if data.geturl() not in (self.base_url+'/my', self.base_url+'/my?locale=en'):
-            raise BruteError("Failed to fetch submission list")
-        data = data.read().decode('utf-8', 'replace')
+        data = self._get('/my?locale=en').decode('utf-8', 'replace')
         csrf = self._get_csrf(data)
         data = data.replace('<tr class="last-row" data-submission-id="', '<tr data-submission-id="').split('<tr data-submission-id="')
         subms = []
@@ -82,18 +110,23 @@ class CodeForces(Backend):
         return ans
     def _get_submission(self, idx, csrf):
         if idx in self._subms_cache: return self._subms_cache[idx]
-        req = self.opener.open('https://'+self.host+'/data/submitSource', urllib.parse.urlencode(
-        {
+        code, headers, req = post('https://'+self.host+'/data/submitSource', {
             'submissionId': idx,
             'csrf_token': csrf
-        }).encode('ascii'))
-        ans = json.loads(req.read().decode('utf-8', 'replace'))
+        }, {
+            'Cookie': self.cookie,
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Referer': self.base_url+'/my'
+        })
+        if code != 200:
+            raise EJError("Failed to fetch submission.")
+        ans = json.loads(req.decode('utf-8', 'replace'))
         if self.caching: self._subms_cache[idx] = ans
         return ans
     def tasks(self):
         q = self._get_submit()[0]
         if not q:
-            data = self.opener.open(self.base_url).read().decode('utf-8')
+            data = self._get(self.base_url).decode('utf-8')
             ans = []
             sp = data.split('<td class="id">\r\n                        <a href="'+self.base_url.rsplit('codeforces.com', 1)[1]+'/problem/')
             if sp[0].rfind('<') > sp[0].rfind('>'):
@@ -107,7 +140,7 @@ class CodeForces(Backend):
             contest_id = self.base_url.split('/')
             while not contest_id[-1]: contest_id.pop()
             contest_id = int(contest_id[-1])
-            data = json.loads(self.opener.open('https://'+self.host+'/api/contest.status?contestId=%d'%contest_id).read().decode('utf-8', 'replace'))
+            data = json.loads(self._get('https://'+self.host+'/api/contest.status?contestId=%d'%contest_id).decode('utf-8', 'replace'))
             if data['status'] != 'OK':
                 raise BruteError('Failed to load submissions.')
             return [bjtypes.submission_t(
@@ -185,12 +218,8 @@ class CodeForces(Backend):
                 if x in i: break
             else: break
         data = b'\r\n'.join(b'--'+x+b'\r\n'+b'Content-Disposition: form-data; name='+i for i in data)+b'\r\n--'+x+b'--\r\n'
-        try:
-            self.opener.open(urllib.request.Request(self.base_url+'/submit?csrf_token='+csrf,
-                                data=data,
-                                headers={'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii')},
-                                method='POST'))
-        except urllib.request.URLError: pass
+        post(self.base_url+'/submit?csrf_token='+csrf, data, {'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii'), 'Cookie': self.cookie})
+        # TODO: handle error here?
     def submit_solution(self, task, lang, text):
         tasks, langs, csrf = self._get_submit()
         self._submit(tasks[task], lang, text, csrf)
@@ -207,7 +236,7 @@ class CodeForces(Backend):
     def scores(self):
         with self.cache_lock: data = self._st_cache
         if data == None:
-            data = self.opener.open(self.base_url+'/standings?locale=en').read().decode('utf-8', 'replace')
+            data = self._get('/standings?locale=en').decode('utf-8', 'replace')
             with self.cache_lock:
                 if self.caching: self._st_cache = data
         tasks = (i.split('href="/contest/', 1)[1].split('"', 1)[0].rsplit('/', 1)[1] for i in data.split('<th ')[5:])
@@ -227,7 +256,7 @@ class CodeForces(Backend):
         contest_id = self.base_url.split('/')
         while not contest_id[-1]: contest_id.pop()
         contest_id = int(contest_id[-1])
-        data = json.loads(self.opener.open('https://'+self.host+'/api/contest.standings?contestId=%d&from=1&count=1000000000'%contest_id).read().decode('utf-8', 'replace'))
+        data = json.loads(self._get('https://'+self.host+'/api/contest.standings?contestId=%d&from=1&count=1000000000'%contest_id).decode('utf-8', 'replace'))
         if data['status'] != 'OK':
             raise BruteError('Failed to load scoreboard.')
         return [
@@ -236,11 +265,13 @@ class CodeForces(Backend):
             for j in i['problemResults']])
         for i in data['result']['rows']]
     def _compile_error(self, subm_id, csrf):
-        return json.loads(self.opener.open('https://'+self.host+'/data/judgeProtocol',
-            urllib.parse.urlencode({
-                'submissionId': subm_id,
-                'csrf_token': csrf
-            }).encode('ascii')).read().decode('utf-8', 'replace'))
+        code, headers, data = post('https://'+self.host+'/data/judgeProtocol', {
+            'submissionId': subm_id,
+            'csrf_token': csrf
+        }, {'Cookie': self.cookie, 'Content-Type': 'application/x-www-form-urlencoded'})
+        if code != 200:
+            raise EJError("Failed to fetch compilation error.")
+        return json.loads(data.decode('utf-8', 'replace'))
     def compile_error(self, subm_id):
         return self._compile_error(subm_id, self._get_submissions()[1])
     def submission_source(self, subm_id):
@@ -263,7 +294,7 @@ class CodeForces(Backend):
         return (ans, None)
     def contest_info(self):
         ans = {}
-        data = self.opener.open(self.base_url.replace('/contest/', '/contests/')+'?locale=en').read().decode('utf-8', 'replace')
+        data = self._get(self.base_url.replace('/contest/', '/contests/')+'?locale=en').decode('utf-8', 'replace')
         data = data.split('<span class="format-time"', 1)[1].split('>', 1)[1].strip()
         date = data.split('<', 1)[0] # dd.mm.yyyy hh:mm, Mmm/dd/yyyy hh:mm for English locale!!!
         duration = data.split('</span>\r\n                </a>\r\n    </td>\r\n    <td>', 1)[1].split('<', 1)[0].strip() # hh:mm
@@ -305,7 +336,7 @@ class CodeForces(Backend):
         return '', q1, q2
     def problem_info(self, prob_id):
         task = self.tasks()[prob_id][1]
-        data = self.opener.open(self.base_url+'/problem/'+task+'?locale='+self.locale).read().decode('utf-8', 'replace')
+        data = self._get('/problem/'+task+'?locale='+self.locale).decode('utf-8', 'replace')
         data = data.split('<div class="property-title">', 1)[1].split('</div><div>', 1)[1]
         data = data.split('<script>')[0]
         data = data.split('<script type="text/javascript">', 1)[0]
@@ -340,12 +371,15 @@ class CodeForces(Backend):
         self._subms_cache.clear()
     def contest_list(self):
         if isinstance(self, str):
-            opener = urllib.request.build_opener()
+            headers = {}
         else:
-            opener = self.opener
+            headers = {'Cookie': self.cookie}
             self = 'https://codeforces.com/contests'
         if self.startswith('http:'): self = 'https:' + self[5:]
-        data = opener.open(self).read().decode('utf-8').split('<tr\r\n    \r\n    data-contestId="')
+        code, headers, data = get(self, headers)
+        if code != 200:
+            raise EJError("Failed to fetch contest list")
+        data = data.decode('utf-8').split('<tr\r\n    \r\n    data-contestId="')
         ans = []
         for i in data[1:]:
             cid, name = i.split('"', 1)

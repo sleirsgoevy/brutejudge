@@ -33,8 +33,7 @@ def do_http(url, method, headers={}, data=b''):
     request.append('')
     request.append('')
     sock.sendall('\r\n'.join(request).encode('utf-8'))
-    if data:
-        sock.sendall(data)
+    if data: sock.sendall(data)
     def readline():
         ans = b''
         while not ans.endswith(b'\n'): ans += sock.recv(1)
