@@ -35,9 +35,9 @@ class CodeForces(Backend):
         if login != None or password != None:
             code, headers, data = get('https://%s/enter?back=%%2F'%self.host, {'Cookie': '; '.join(map('='.join, cookies.items()))} if cookies else {})
             if code == 403:
-                raise EJError("CloudFlare is angry at you. Get a token!")
+                raise BruteError("CloudFlare is angry at you. Get a token!")
             elif code != 200:
-                raise EJError("Error getting CSRF token for login.")
+                raise BruteError("Error getting CSRF token for login.")
             if 'Set-Cookie' in headers:
                 new_cookies = headers['Set-Cookie']
                 if isinstance(new_cookies, str): new_cookies = [new_cookies]
@@ -45,7 +45,7 @@ class CodeForces(Backend):
                     k, v = i.split(';', 1)[0].strip().split('=', 1)
                     cookies[k] = v
             else:
-                raise EJError("No cookies received from server.")
+                raise BruteError("No cookies received from server.")
             self.cookie = '; '.join(map('='.join, cookies.items()))
             csrf = self._get_csrf(data.decode('utf-8', 'replace'))
             code, headers, data = post('https://%s/enter?back=%%2F'%self.host, {
@@ -68,15 +68,22 @@ class CodeForces(Backend):
         self._gs_cache = None
         self._st_cache = None
         self._subms_cache = {}
-    def _get(self, path, code=200):
+    def _get(self, path, codes=set()):
         if path.startswith('/'):
             path = self.base_url + path
         code, headers, data = get(path, {'Cookie': self.cookie})
-        if code != 200:
-            raise EJError("HTTP error %d on URL %s"%(code, path))
-        return data
+        if code == 200 and not codes:
+            return data
+        elif code in codes:
+            return code, headers, data
+        elif code in (301, 302):
+            raise BruteError("Got unexpected redirect %d (%s -> %s)" %(code, path, headers['Location']))
+        raise BruteError("HTTP error %d on URL %s"%(code, path))
     def _get_submit(self):
-        data = self._get('/submit?locale=en').decode('utf-8', 'replace')
+        code, headers, data = self._get('/submit?locale=en', {200, 301, 302})
+        if code in (301, 302):
+            return None, None, None
+        data = data.decode('utf-8', 'replace')
         csrf = self._get_csrf(data)
         data1 = data.split('name="submittedProblemIndex">', 1)[1].split('</select>', 1)[0].split('<option value="')
         tasks = [i.split('"', 1)[0] for i in data1[2:]]
@@ -119,13 +126,13 @@ class CodeForces(Backend):
             'Referer': self.base_url+'/my'
         })
         if code != 200:
-            raise EJError("Failed to fetch submission.")
+            raise BruteError("Failed to fetch submission.")
         ans = json.loads(req.decode('utf-8', 'replace'))
         if self.caching: self._subms_cache[idx] = ans
         return ans
     def tasks(self):
         q = self._get_submit()[0]
-        if not q:
+        if q is None:
             data = self._get(self.base_url).decode('utf-8')
             ans = []
             sp = data.split('<td class="id">\r\n                        <a href="'+self.base_url.rsplit('codeforces.com', 1)[1]+'/problem/')
@@ -222,6 +229,8 @@ class CodeForces(Backend):
         # TODO: handle error here?
     def submit_solution(self, task, lang, text):
         tasks, langs, csrf = self._get_submit()
+        if tasks is None:
+            raise BruteError("Submissions are closed.")
         self._submit(tasks[task], lang, text, csrf)
         with self.cache_lock: self.stop_caching()
     def status(self):
@@ -270,7 +279,7 @@ class CodeForces(Backend):
             'csrf_token': csrf
         }, {'Cookie': self.cookie, 'Content-Type': 'application/x-www-form-urlencoded'})
         if code != 200:
-            raise EJError("Failed to fetch compilation error.")
+            raise BruteError("Failed to fetch compilation error.")
         return json.loads(data.decode('utf-8', 'replace'))
     def compile_error(self, subm_id):
         return self._compile_error(subm_id, self._get_submissions()[1])
@@ -278,7 +287,9 @@ class CodeForces(Backend):
         subm = self._get_submission(subm_id, self._get_submissions()[1])
         if 'source' in subm: return subm['source'].encode('utf-8')
     def compiler_list(self, prob_id):
-        return self._get_submit()[1]
+        ans = self._get_submit()[1]
+        if ans is None: ans = []
+        return ans
     def submission_stats(self, subm_id):
         subm = self._get_submission(subm_id, self._get_submissions()[1])
         ans = {}
@@ -377,8 +388,11 @@ class CodeForces(Backend):
             self = 'https://codeforces.com/contests'
         if self.startswith('http:'): self = 'https:' + self[5:]
         code, headers, data = get(self, headers)
+        while code in (301, 302):
+            self = urllib.parse.urljoin(self, headers['Location'])
+            code, headers, data = get(self, headers)
         if code != 200:
-            raise EJError("Failed to fetch contest list")
+            raise BruteError("Failed to fetch contest list.")
         data = data.decode('utf-8').split('<tr\r\n    \r\n    data-contestId="')
         ans = []
         for i in data[1:]:
