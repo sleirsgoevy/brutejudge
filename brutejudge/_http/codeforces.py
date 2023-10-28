@@ -131,17 +131,16 @@ class CodeForces(Backend):
         if self.caching: self._subms_cache[idx] = ans
         return ans
     def tasks(self):
-        q = self._get_submit()[0]
-        if q is None:
-            data = self._get(self.base_url).decode('utf-8')
-            ans = []
-            sp = data.split('<td class="id">\r\n                        <a href="'+self.base_url.rsplit('codeforces.com', 1)[1]+'/problem/')
-            if sp[0].rfind('<') > sp[0].rfind('>'):
-                return ans
-            for i in sp[1:]:
-                ans.append(i.split('"', 1)[0])
-            return [bjtypes.task_t(i, j, None) for i, j in enumerate(ans)]
-        return [bjtypes.task_t(i, j, None) for i, j in enumerate(q)]
+        data = self._get(self.base_url).decode('utf-8')
+        ans = []
+        ans1 = []
+        sp = data.split('<td class="id">\r\n                        <a href="'+self.base_url.rsplit('codeforces.com', 1)[1]+'/problem/')
+        if sp[0].rfind('<') > sp[0].rfind('>'):
+            return ans
+        for i in sp[1:]:
+            ans.append(i.split('"', 1)[0])
+            ans1.append(i.split('-->', 1)[1].split('<', 1)[0])
+        return [bjtypes.task_t(i, j, k) for (i, j), k in zip(enumerate(ans), ans1)]
     def submissions(self, all=False):
         if all:
             contest_id = self.base_url.split('/')
@@ -387,9 +386,9 @@ class CodeForces(Backend):
             headers = {'Cookie': self.cookie}
             self = 'https://codeforces.com/contests'
         if self.startswith('http:'): self = 'https:' + self[5:]
-        code, headers, data = get(self, headers)
+        code, resp_headers, data = get(self, headers)
         while code in (301, 302):
-            self = urllib.parse.urljoin(self, headers['Location'])
+            self = urllib.parse.urljoin(self, resp_headers['Location'])
             code, headers, data = get(self, headers)
         if code != 200:
             raise BruteError("Failed to fetch contest list.")

@@ -26,6 +26,7 @@ def html2md(data, dload_prefix=None, base=None):
     ans = do_unescape(data[0])
     is_code = None
     hrefs = []
+    prev = None
     for i in data[1:]:
         if i.startswith('a href="'):
             href, i = i[8:].split('">', 1)
@@ -48,6 +49,9 @@ def html2md(data, dload_prefix=None, base=None):
             ans += '\n\n'+'#'*int(d[1])+' '+do_unescape(i, is_code)
         elif i.startswith('li>'):
             ans += '* ' + do_unescape(i[3:], is_code)
+        elif i.startswith('div class="test-example-line ') and prev == '/div>': # codeforces
+            assert ans.endswith('\n\n')
+            ans = ans[:-1] + do_unescape(i.split('>', 1)[1], is_code)
         elif any(i.startswith(x) for x in ('br>', 'br/>', 'br />', '/h1>', '/h2>', '/h3>', '/h4>', '/h5>', '/h6>', '/p>', '/li>', '/div>')):
             ans += '\n\n' + do_unescape(i.split('>', 1)[1], is_code)
         elif i.startswith('/a>'):
@@ -83,6 +87,7 @@ def html2md(data, dload_prefix=None, base=None):
                 ans += '<' + do_unescape(i, is_code)
             else:
                 ans += do_unescape(i.split('>', 1)[-1], is_code)
+        prev = i
     return '\n\n'.join(i for i in ans.split('\n\n') if i).replace('\n\n\n', '\n\n').strip()
 
 def md2html(data):

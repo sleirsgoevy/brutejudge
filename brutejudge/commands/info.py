@@ -123,11 +123,12 @@ backslashes['ngtr'] = '\u226f'
 backslashes['nleq'] = '\u2270'
 backslashes['ngeq'] = '\u2271'
 backslashes['ell'] = 'l'
+backslashes['in'] = backslashes['isin']
 
 def fn_underline(s, bm, i):
     q, i = peek(s, bm, i)
     ch = '\u0332'
-    return ch + ch.join(q), i
+    return ch + ch.join(untex_expr(q)), i
 backslashes['underline'] = fn_underline
 
 def fn_limits(s, bm, i):
@@ -141,6 +142,7 @@ def fn_text(s, bm, i):
     s, i = peek(s, bm, i)
     return untex(s), i
 backslashes['text'] = fn_text
+backslashes['texttt'] = fn_text
 backslashes['mathrm'] = peek
 
 def fn_xrightarrow(s, bm, i):

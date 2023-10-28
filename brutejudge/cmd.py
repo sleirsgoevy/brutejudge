@@ -77,14 +77,14 @@ class BruteCMD(cmd.Cmd):
             print(url+'\t'+title)
     def do_tasks(self, cmd):
         """
-        usage: tasks [--verbose]
+        usage: tasks [-v|--verbose]
 
-        Show task list. If --verbose is specified, also show additional information.
+        Show task list. If -v or --verbose is specified, also show additional information.
         """
-        if not isspace(cmd) and cmd.strip() != '--verbose':
+        if not isspace(cmd) and cmd.strip() not in ('--verbose', '-v'):
             return self.do_help('tasks')
         data = tasks(self.url, self.cookie)
-        if cmd.strip() == '--verbose':
+        if cmd.strip() in ('-v', '--verbose'):
             print('Short name\tLong name')
             for i, j, k in data: print(j, k, sep='\t\t')
         else:
