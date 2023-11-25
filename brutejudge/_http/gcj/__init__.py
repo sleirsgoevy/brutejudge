@@ -1,4 +1,4 @@
-import base64, json, collections
+import base64, json, collections, time
 import brutejudge._http.types as bjtypes
 from .oauth import do_oauth
 from ..base import Backend
@@ -180,7 +180,7 @@ class GCJ(Backend):
         q, c = divmod(q, 60)
         a, b = divmod(q, 24)
         if a: return '%d:%02d:%02d:%02d'%(a, b, c, d)
-        else: return '%02d:%02d:%02d:%02d'%(b, c, d)
+        else: return '%02d:%02d:%02d'%(b, c, d)
     def contest_info(self):
         db = self._get_dashboard("Failed to fetch contest info.")
         data1 = {'contest_start': db['challenge']['start_ms'] / 1000, 'contest_end': db['challenge']['end_ms'] / 1000}

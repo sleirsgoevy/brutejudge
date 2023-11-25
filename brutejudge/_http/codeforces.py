@@ -56,7 +56,7 @@ class CodeForces(Backend):
                 'handleOrEmail': login,
                 'password': password
             }, {'Cookie': self.cookie, 'Content-Type': 'application/x-www-form-urlencoded'})
-            if code != 302:
+            if code != 302 or headers['Location'] != 'https://%s/'%self.host:
                 raise BruteError("Login failed.")
             if 'Set-Cookie' in headers:
                 new_cookies = headers['Set-Cookie']
@@ -77,6 +77,8 @@ class CodeForces(Backend):
         elif code in codes:
             return code, headers, data
         elif code in (301, 302):
+            if headers['Location'] == 'https://%s/enter?back=%2F'%self.host:
+                raise BruteError("Login required (contest not started?)")
             raise BruteError("Got unexpected redirect %d (%s -> %s)" %(code, path, headers['Location']))
         raise BruteError("HTTP error %d on URL %s"%(code, path))
     def _get_submit(self):

@@ -102,6 +102,12 @@ def match(s, bm, i, what):
 def peek(s, bm, i):
     if s[i] == '{' and i in bm:
         return s[i+1:bm[i]], bm[i]+1
+    elif s[i] == '\\':
+        j = i + 1
+        while j < len(s) and s[j].isalnum():
+            j += 1
+        j = max(j, min(len(s), i+2))
+        return s[i:j], j
     return s[i], i+1
 
 backslashes = {k: chr(v) for k, v in html.entities.name2codepoint.items()}
@@ -144,6 +150,7 @@ def fn_text(s, bm, i):
 backslashes['text'] = fn_text
 backslashes['texttt'] = fn_text
 backslashes['mathrm'] = peek
+backslashes['mathtt'] = peek
 
 def fn_xrightarrow(s, bm, i):
     args = []
@@ -208,6 +215,10 @@ def untex_expr(s):
                         ans += q
                 else:
                     ans += '\\' + cmd
+        elif s[i] == '^' and i + 1 < len(s):
+            ss, i = peek(s, bm, i + 1)
+            ss = untex_expr(ss)
+            ans += '^' + (ss if ss.isalnum() else '('+ss+')')
         elif s[i] == '_' and i + 1 < len(s):
             ss, i = peek(s, bm, i + 1)
             ans += '[' + untex_expr(ss) + ']'
