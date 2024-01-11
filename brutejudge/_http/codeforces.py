@@ -77,7 +77,7 @@ class CodeForces(Backend):
         elif code in codes:
             return code, headers, data
         elif code in (301, 302):
-            if headers['Location'] == 'https://%s/enter?back=%2F'%self.host:
+            if headers['Location'] == 'https://%s/enter?back=%%2F'%self.host:
                 raise BruteError("Login required (contest not started?)")
             raise BruteError("Got unexpected redirect %d (%s -> %s)" %(code, path, headers['Location']))
         raise BruteError("HTTP error %d on URL %s"%(code, path))

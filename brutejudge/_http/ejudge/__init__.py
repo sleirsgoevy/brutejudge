@@ -369,6 +369,9 @@ class Ejudge(Backend):
         if b'<input type="submit" name="action_35" value="Change!" />' in data:
             raise BruteError("Password change is required.")
         data = data.decode('utf-8')
+        statements_url = None
+        if '" target="_blank">Statements</a></div></li><li><div class="contest_actions_item"><a class="menu" href="' in data:
+            statements_url = html.unescape(data.split('" target="_blank">Statements</a></div></li><li><div class="contest_actions_item"><a class="menu" href="', 1)[0].rsplit('"', 1)[1])
         try: pbs = '\n'.join(html.unescape(i.split('</b></p>', 1)[0]) for i in data.split('<p><b>')[1:])
         except IndexError: pbs = ''
         datas = {}
@@ -385,7 +388,7 @@ class Ejudge(Backend):
                 continue
             if ' ' in datas[k2]:
                 date, s_time = datas[k2].split(' ')
-                year, month, day = map(int, date.split('/'))
+                year, month, day = map(int, date.replace('-', '/').split('/'))
                 hour, minute, second = map(int, s_time.split(':'))
                 data1[k1] = time.mktime((year, month, day, hour, minute, second, -1, -1, -1))
             else:
@@ -396,16 +399,20 @@ class Ejudge(Backend):
             data1['contest_end'] = data1['contest_start'] + data1['contest_duration']
         if 'contest_start' in data1 and 'server_time' in data1:
             data1['contest_time'] = data1['server_time'] - data1['contest_start']
-        return (pbs, datas, data1)
+        if statements_url is not None:
+            pbs += '\n[Statements]('+statements_url+')\n'
+        return (pbs, {k.rstrip(':'): v for k, v in datas.items()}, data1)
     def problem_info(self, id):
         code, headers, data = self._cache_get(self.urls['submission'].format(prob_id=id))
         if b'<input type="submit" name="action_35" value="Change!" />' in data:
             raise BruteError("Password change is required.")
         data = data.decode('utf-8')
         if '<table class="line-table-wb">' not in data: return ({}, None)
-        data = data.split('<table class="line-table-wb">', 1)[1]
+        data = data.split('<table class="line-table-wb">', 1)[1].split('<div id="ej-submit-tabs">', 1)[0]
         stats = {}
         data, data2 = data.split('</table>', 1)
+        if data2.strip().startswith('<script>'):
+            data2 = data2.split('</script>', 1)[1]
         while '<tr><td><b>' in data:
             k, data = data.split('<tr><td><b>', 1)[1].split('</b></td><td>', 1)
             v, data = data.split('</td></tr>', 1)
@@ -469,12 +476,7 @@ class Ejudge(Backend):
         return tests
     def get_samples(self, subm_id):
         return self._get_samples(self.compile_error(subm_id))
-    def scoreboard(self):
-        code, headers, data = self._cache_get(self.urls['standings'])
-        if b'<input type="submit" name="action_35" value="Change!" />' in data:
-            raise BruteError("Password change is required.")
-        if code != 200:
-            raise BruteError("Failed to fetch scoreboard.")
+    def _parse_scoreboard(self, data):
         teams = data.decode('utf-8').split('<td  class="st_team">')[1:]
         probs = data.decode('utf-8').split('<td  class="st_prob')[1:]
         naux = 0
@@ -502,14 +504,29 @@ class Ejudge(Backend):
                     score = int(j[3:-4])
                     attempts = float('inf')
                     ans[-1][1].append({'score': score, 'attempts': attempts})
+                elif j.startswith('<b>') and '</b> (' in j and j.endswith(')') and j[3:j.find('</b> (')].isnumeric() and j[j.find('</b> (')+6:-1].isnumeric():
+                    score = int(j[3:j.find('</b> (')])
+                    attempts = int(j[j.find('</b> (')+6:-1])
+                    ans[-1][1].append({'score': score, 'attempts': attempts})
                 elif j.isnumeric():
                     score = int(j)
                     attempts = float('-inf')
+                    ans[-1][1].append({'score': score, 'attempts': attempts})
+                elif ' (' in j and j.endswith(')') and j[:j.find(' (')].isnumeric() and j[j.find(' (')+2:-1].isnumeric():
+                    score = int(j[:j.find(' (')])
+                    attempts = int(j[j.find(' (')+2:-1])
                     ans[-1][1].append({'score': score, 'attempts': attempts})
                 else:
                     assert False, repr(j)
             for j in range(naux): next(probs)
         return ans
+    def scoreboard(self):
+        code, headers, data = self._cache_get(self.urls['standings'])
+        if b'<input type="submit" name="action_35" value="Change!" />' in data:
+            raise BruteError("Password change is required.")
+        if code != 200:
+            raise BruteError("Failed to fetch scoreboard.")
+        return self._parse_scoreboard(data)
     def stop_caching(self):
         self._get_cache.clear()
     def contest_list(self):
