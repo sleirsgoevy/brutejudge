@@ -477,12 +477,14 @@ class Ejudge(Backend):
     def get_samples(self, subm_id):
         return self._get_samples(self.compile_error(subm_id))
     def _parse_scoreboard(self, data):
-        teams = data.decode('utf-8').split('<td  class="st_team">')[1:]
-        probs = data.decode('utf-8').split('<td  class="st_prob')[1:]
+        data = data.decode('utf-8')
+        data = data.split('\n  <tr >\n    <th  class="st_place">Place</th>', 1)[-1]
+        teams = data.split('<td  class="st_team">')[1:]
+        probs = data.split('<td  class="st_prob')[1:]
         naux = 0
-        if not teams and b'<table border=1 cellspacing=1 celpadding=3>\n  <tr >\n    <th  align=right>Place</th>' in data:
-            probs = sum((i.split('<td class="st_prob') for i in data.decode('utf-8').split('<td  align=center')), [])[1:]
-            teams = data.decode('utf-8').split('<td  align=left>')[1:]
+        if not teams and '<table border=1 cellspacing=1 celpadding=3>\n  <tr >\n    <th  align=right>Place</th>' in data:
+            probs = sum((i.split('<td class="st_prob') for i in data.split('<td  align=center')), [])[1:]
+            teams = data.split('<td  align=left>')[1:]
             naux = 1
         probs = [x.split("</td>", 1)[0] for x in probs]
         teams = [html.unescape(x.split("</td>", 1)[0]) for x in teams]
