@@ -41,8 +41,6 @@ class AtCoder(Backend):
         return ans
     def stop_caching(self):
         self._cache.clear()
-    # to register:
-    # POST contest/register with csrf_token
     def _tasks(self):
         code, headers, data = self._cache_get(self.url+'/tasks')
         if code != 200:
@@ -140,6 +138,10 @@ class AtCoder(Backend):
             code, headers, data = post('https://atcoder.jp'+self.url+'/register', {'csrf_token': self.csrf_token}, {'Cookie': self.cookie, 'Content-Type': 'application/x-www-form-urlencoded'})
             if code != 302 or headers['Location'] != self.url:
                 raise BruteError("Registration failed.")
+        elif name in ('rated_register', 'unrated_register'):
+            code, headers, data = post('https://atcoder.jp'+self.url+'/register', {'csrf_token': self.csrf_token, 'rated': 'true' if name == 'rated_register' else 'false'}, {'Cookie': self.cookie, 'Content-Type': 'application/x-www-form-urlencoded'})
+            if code != 302 or headers['Location'] != self.url:
+                raise BruteError("Registration failed.")
     def compiler_list(self, task):
         code, headers, data = self._cache_get(self.url+'/submit')
         if code != 200:
@@ -185,7 +187,7 @@ class AtCoder(Backend):
         else:
             return '%02d:%02d:%02d'%(hours, minutes, seconds)
     def _get_html(self, data, spc):
-        return ('\r\n'+data.split('\r\n'+spc+'<span class="lang-'+self.locale+'">\r\n', 1)[1]).split('\r\n'+spc+'</span>\r\n', 1)[0].strip()
+        return ('\n'+data.replace('\r\n', '\n').split('\n'+spc+'<span class="lang-'+self.locale+'">\n', 1)[1]).split('\n'+spc+'</span>\n', 1)[0].strip()
     def contest_info(self):
         code, headers, data = self._cache_get(self.url)
         if code != 200:
