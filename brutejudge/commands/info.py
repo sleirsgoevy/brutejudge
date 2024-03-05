@@ -87,7 +87,7 @@ def match(s, bm, i, what):
             if s[i] == '\\':
                 # TODO: dedupe with loop in untex_expr
                 k = i + 1
-                while k < len(s) and s[k].isalnum():
+                while k < len(s) and s[k].isalpha():
                     k += 1
                 cmd = s[i+1:k]
                 if cmd in backslashes:
@@ -117,7 +117,7 @@ def peek(s, bm, i):
         return s[i+1:bm[i]], bm[i]+1
     elif s[i] == '\\':
         j = i + 1
-        while j < len(s) and s[j].isalnum():
+        while j < len(s) and s[j].isalpha():
             j += 1
         j = max(j, min(len(s), i+2))
         return s[i:j], j
@@ -144,6 +144,7 @@ backslashes['nleq'] = '\u2270'
 backslashes['ngeq'] = '\u2271'
 backslashes['ell'] = 'l'
 backslashes['in'] = backslashes['isin']
+backslashes['ddagger'] = backslashes['Dagger']
 
 def fn_underline(s, bm, i):
     q, i = peek(s, bm, i)
@@ -211,13 +212,13 @@ def untex_expr(s):
         if s[i] == '\\':
             if i + 1 >= len(s):
                 break
-            elif not s[i + 1].isalnum():
+            elif not s[i + 1].isalpha():
                 ans += s[i + 1]
                 i += 2
                 continue
             else:
                 j = i + 1
-                while j < len(s) and s[j].isalnum():
+                while j < len(s) and s[j].isalpha():
                     j += 1
                 cmd = s[i+1:j]
                 i = j
