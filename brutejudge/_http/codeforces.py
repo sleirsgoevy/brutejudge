@@ -9,7 +9,7 @@ class CodeForces(Backend):
     @staticmethod
     def detect(url):
         url = url.split('/')
-        return url[0] in ('http:', 'https:') and not url[1] and ('.'+url[2]).endswith('.codeforces.com') and url[3] in ('contest', 'contests')
+        return len(url) >= 4 and url[0] in ('http:', 'https:') and not url[1] and ('.'+url[2]).endswith('.codeforces.com') and (url[3] in ('contest', 'contests') or len(url) >= 6 and url[3] == 'group' and url[5] == 'contest')
     @staticmethod
     def _get_csrf(data):
         return data.split('<meta name="X-Csrf-Token" content="', 1)[1].split('"', 1)[0]
@@ -79,6 +79,8 @@ class CodeForces(Backend):
         elif code in (301, 302):
             if headers['Location'] == 'https://%s/enter?back=%%2F'%self.host:
                 raise BruteError("Login required (contest not started?)")
+            elif headers['Location'] == self.base_url + '/countdown':
+                raise BruteError("Contest not started yet (countdown)")
             raise BruteError("Got unexpected redirect %d (%s -> %s)" %(code, path, headers['Location']))
         raise BruteError("HTTP error %d on URL %s"%(code, path))
     def _get_submit(self):

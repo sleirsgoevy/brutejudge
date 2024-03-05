@@ -68,6 +68,26 @@ def unescape_strings(s):
         i += 1
     return ans
 
+def rle_kind(c):
+    if c.isalnum() or c == '_': return 1
+    elif c.isspace(): return 2
+    else: return 3
+
+def rle_tokenize(s, bad=None):
+    ans = [s[0]]
+    for c in s[1:]:
+        k = rle_kind(c)
+        if k == bad or k != rle_kind(ans[-1][-1]):
+            ans.append(c)
+        else:
+            ans[-1] += c
+    ans1 = [ans[0]]
+    for i in ans[1:]:
+        if not ans1[-1].isspace() and not i.isspace():
+            ans1.append('')
+        ans1.append(i)
+    return ans1
+
 def format(original, options=set(), cplusplus=True):
     original = escape_strings(original)
     i = 0
@@ -165,4 +185,35 @@ def format(original, options=set(), cplusplus=True):
                         j[k-1] = j[k-1][:jj].rstrip() + '\n' + j[k-1][jj:]
             s[i] = '('.join(j)
         s = '\n'.join(s)
+    for i in options:
+        if i.startswith('+freopen='):
+            filename = i[9:]
+            if ':' in filename:
+                stdin_filename, stdout_filename = filename.split(':', 1)
+            else:
+                stdin_filename = stdout_filename = filename
+            s = rle_tokenize(s, 3)
+            s1 = [i.strip() for i in s]
+            main_starts = []
+            for i in range(len(s) - 7):
+                if s1[i:i+7] == ['main', '', '(', '', ')', '', '{']:
+                    main_starts.append(i+7)
+            for i in range(len(s) - 9):
+                if s1[i:i+9] == ['main', '', '(', '', 'void', '', ')', '', '{']:
+                    main_starts.append(i+9)
+            j = 0
+            s2 = []
+            for i in sorted(main_starts):
+                if i >= len(s): break
+                if i <= j: continue
+                s2 += s[j:i+1]
+                if '\n' in s[i]:
+                    n_spaces = len(s[i]) - len(s[i].rstrip(' '))
+                    suffix = '\n' + ' ' * n_spaces
+                else:
+                    suffix = ' '
+                s2.append(escape_strings('freopen("%s", "r", stdin);'%stdin_filename + suffix + 'freopen("%s", "w", stdout);'%stdout_filename + suffix))
+                j = i + 1
+            s2 += s[j:]
+            s = ''.join(s2)
     return unescape_strings(s)

@@ -83,7 +83,20 @@ def match(s, bm, i, what):
             i += 1
             j += 1
         elif what[j] == '{':
-            if s[i] != '{' or i not in bm:
+            while s[i].isspace(): i += 1
+            if s[i] == '\\':
+                # TODO: dedupe with loop in untex_expr
+                k = i + 1
+                while k < len(s) and s[k].isalnum():
+                    k += 1
+                cmd = s[i+1:k]
+                if cmd in backslashes:
+                    if not isinstance(backslashes[cmd], str):
+                        # XXX: running the command handler just to get an estimate of the position
+                        k = backslashes[cmd](s, bm, k)[1]
+                    ans.append(s[i:k])
+                    i = k
+            elif s[i] != '{' or i not in bm:
                 ans.append(s[i])
                 i += 1
             else:
@@ -114,6 +127,7 @@ backslashes = {k: chr(v) for k, v in html.entities.name2codepoint.items()}
 backslashes['dots'] = '...'
 backslashes['ldots'] = '...'
 backslashes['cdots'] = '...'
+backslashes['dotsc'] = '...'
 backslashes['cdot'] = backslashes['middot']
 backslashes['rightarrow'] = '\u2192'
 backslashes['bmod'] = ' mod '
