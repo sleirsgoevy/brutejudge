@@ -33,3 +33,5 @@ class Backend:
         return ['login', 'pass']
     def contest_list(self):
         return []
+    def action_list(self):
+        return []

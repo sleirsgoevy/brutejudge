@@ -40,6 +40,7 @@ Then type `brutejudge` into the prompt.
 
 ```
                     AggressiveCacheBackend FileBackend EJFuse  JJS     Informatics CodeForces GCJ     CupsOnline YaContest InfOpen AtCoder PCMS    Ejudge 
+action_list         OK                     missing     inherit inherit OK          OK         inherit inherit    OK        inherit OK      inherit OK     
 change_password     missing                missing     inherit missing inherit     missing    missing missing    missing   inherit missing missing OK     
 clar_list           missing                missing     inherit missing stub        stub       missing missing    OK        inherit OK      OK      OK     
 compile_error       OK                     missing     OK      OK      OK          OK         OK      OK         OK        inherit OK      OK      OK     
@@ -47,7 +48,7 @@ compiler_list       OK                     missing     OK      OK      OK       
 contest_info        missing                missing     OK      OK      OK          OK         OK      OK         OK        inherit OK      OK      OK     
 contest_list        OK                     missing     inherit OK      inherit     OK         OK      OK         inherit   inherit OK      inherit OK     
 detect              OK                     OK          OK      OK      OK          OK         OK      OK         OK        OK      OK      OK      OK     
-do_action           OK                     missing     inherit missing OK          missing    stub    missing    OK        inherit OK      stub    OK     
+do_action           OK                     missing     inherit missing OK          OK         stub    missing    OK        inherit OK      stub    OK     
 download_file       missing                missing     inherit missing stub        stub       missing missing    missing   inherit missing stub    OK     
 get_samples         missing                missing     OK      OK      stub        OK         missing OK         missing   inherit missing missing OK     
 locales             missing                missing     missing missing missing     OK         missing missing    missing   missing missing missing missing

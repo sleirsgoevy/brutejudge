@@ -155,6 +155,8 @@ class YaContest(Backend):
         t = self.tasks()[task][1]
         data = self.opener.open(self.url+'/problems/'+t+'/').read().decode('utf-8', 'replace')
         return self._compiler_list(data)
+    def action_list(self):
+        return ['start_virtual', 'stop_virtual', 'restart_virtual']
     def do_action(self, action):
         try: url = self.url + {'stop_virtual': '/finish/?return=false', 'restart_virtual': '/finish/?return=true'}[action]
         except KeyError: pass

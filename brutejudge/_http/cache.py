@@ -40,6 +40,10 @@ class AggressiveCacheBackend:
         except KeyError: pass
         self.submission_source_cache[id] = self.parent.submission_source(id)
         return self.submission_source_cache[id]
+    def action_list(self):
+        ans = self.parent.action_list()
+        if 'flush_cache' not in ans: ans.append('flush_cache')
+        return ans
     def do_action(self, id, *args):
         if id == 'flush_cache':
             self.task_list_cache = None

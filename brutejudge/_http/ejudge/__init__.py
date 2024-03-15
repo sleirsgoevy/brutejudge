@@ -316,6 +316,8 @@ class Ejudge(Backend):
         if code != 200 or 'html' in rhd['Content-Type']:
             return None
         return data
+    def action_list(self):
+        return ['start_virtual', 'stop_virtual']
     def do_action(self, name, *args):
         code, headers, data = get(self.urls[name], {'Cookie': self.cookie})
         if b'<input type="submit" name="action_35" value="Change!" />' in data:
@@ -408,7 +410,7 @@ class Ejudge(Backend):
             raise BruteError("Password change is required.")
         data = data.decode('utf-8')
         if '<table class="line-table-wb">' not in data: return ({}, None)
-        data = data.split('<table class="line-table-wb">', 1)[1].split('<div id="ej-submit-tabs">', 1)[0]
+        data = data.split('<table class="line-table-wb">', 1)[1]
         stats = {}
         data, data2 = data.split('</table>', 1)
         if data2.strip().startswith('<script>'):
@@ -419,7 +421,11 @@ class Ejudge(Backend):
             v = v.split('<')
             v = v[0]+''.join(i.split('>', 1)[1] for i in v[1:])
             stats[k.rsplit(':', 1)[0].strip()] = html.unescape(v.strip())
-        data = data2.split('<form method="post" enctype="multipart/form-data" action="', 1)[0].rsplit('<h3>', 1)[0]
+        data = data2.split('<form method="post" enctype="multipart/form-data" action="', 1)[0]
+        if '<div id="ej-submit-tabs">' in data:
+            data = data.split('<div id="ej-submit-tabs">', 1)[0]
+        else:
+            data = data.rsplit('<h3>', 1)[0]
         if data.endswith('</html>\n'):
             data = ''
         return (stats, html2md.html2md(data, self.urls['download_file'].format(prob_id=id, filename=''), self.urls['submission'].format(prob_id=id)))

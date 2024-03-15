@@ -133,6 +133,8 @@ class AtCoder(Backend):
         return self._submission_field(subm_id, '<h4>Compile Error</h4>')
     def submission_source(self, subm_id):
         return self._submission_field(subm_id, '<p><span class="h4">Source Code</span>', '<pre id="submission-code" data-ace-mode="').encode('utf-8')
+    def action_list(self):
+        return ['register', 'rated_register', 'unrated_register']
     def do_action(self, name, *args):
         if name == 'register':
             code, headers, data = post('https://atcoder.jp'+self.url+'/register', {'csrf_token': self.csrf_token}, {'Cookie': self.cookie, 'Content-Type': 'application/x-www-form-urlencoded'})

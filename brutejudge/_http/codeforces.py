@@ -9,7 +9,7 @@ class CodeForces(Backend):
     @staticmethod
     def detect(url):
         url = url.split('/')
-        return len(url) >= 4 and url[0] in ('http:', 'https:') and not url[1] and ('.'+url[2]).endswith('.codeforces.com') and (url[3] in ('contest', 'contests') or len(url) >= 6 and url[3] == 'group' and url[5] == 'contest')
+        return len(url) >= 4 and url[0] in ('http:', 'https:') and not url[1] and ('.'+url[2]).endswith('.codeforces.com') and (url[3] in ('contest', 'contests') or len(url) >= 6 and url[3] == 'group' and url[5] in ('contest', 'contests'))
     @staticmethod
     def _get_csrf(data):
         return data.split('<meta name="X-Csrf-Token" content="', 1)[1].split('"', 1)[0]
@@ -29,6 +29,7 @@ class CodeForces(Backend):
         if url.find('/contest') == url.find('/contests'):
             url = '/contest'.join(url.split('/contests', 1))
         self.base_url = url
+        self.contest_list_url = url.split('/contest/', 1)[0]+'/contests'
         self.handle = login
         self.host = url.split('/')[2]
         cookies = {'cf_clearance': cf_clearance} if cf_clearance != None else {}
@@ -289,6 +290,28 @@ class CodeForces(Backend):
     def submission_source(self, subm_id):
         subm = self._get_submission(subm_id, self._get_submissions()[1])
         if 'source' in subm: return subm['source'].encode('utf-8')
+    def action_list(self):
+        return ['register']
+    def do_action(self, action, *args):
+        if action == 'register':
+            url = self.base_url.replace('/contest/', '/contestRegistration/')
+            code, headers, data = self._get(url, {200, 302})
+            if code != 200:
+                return False
+            csrf_token = self._get_csrf(data.decode('utf-8', 'replace'))
+            code, headers, data = post(url, {
+                'csrf_token': csrf_token,
+                'action': 'formSubmitted',
+                'takePartAs': 'personal',
+                'teamId': '-1',
+            }, {
+                'Cookie': self.cookie,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': url,
+            })
+            return code == 302
+        else:
+            raise BruteError("Not implemented.")
     def compiler_list(self, prob_id):
         ans = self._get_submit()[1]
         if ans is None: ans = []
@@ -388,7 +411,7 @@ class CodeForces(Backend):
             headers = {}
         else:
             headers = {'Cookie': self.cookie}
-            self = 'https://codeforces.com/contests'
+            self = self.contest_list_url
         if self.startswith('http:'): self = 'https:' + self[5:]
         code, resp_headers, data = get(self, headers)
         while code in (301, 302):
@@ -396,13 +419,19 @@ class CodeForces(Backend):
             code, headers, data = get(self, headers)
         if code != 200:
             raise BruteError("Failed to fetch contest list.")
-        data = data.decode('utf-8').split('<tr\r\n    \r\n    data-contestId="')
+        data = data.decode('utf-8').replace('<tr\r\n     class="highlighted-row"\r\n    data-contestId="', '<tr\r\n    \r\n    data-contestId="').split('<tr\r\n    \r\n    data-contestId="')
         ans = []
         for i in data[1:]:
             cid, name = i.split('"', 1)
             cid = int(cid)
+            url = 'https://codeforces.com/contest/'+str(cid)
+            name = name.lstrip()
+            if name.startswith('data-groupContestId="'):
+                assert '/group/' in self and self.endswith('/contests')
+                #cid = int(name.split('"', 2)[1])
+                url = self[:-1]+'/'+str(cid)
             name = html.unescape(name.split('<td>', 1)[1].split('<br/>', 1)[0].split('</td>', 1)[0].strip())
-            ans.append((name, 'https://codeforces.com/contest/'+str(cid), {}))
+            ans.append((name, url, {}))
         return ans
     def locales(self):
         return [('en', 'English'), ('ru', 'Russian')]

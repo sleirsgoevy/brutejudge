@@ -13,7 +13,7 @@ def read_file(name, options=set(), includes=None):
             l = lines[i]
             if l.startswith('#include "'):
                 p2 = os.path.join(os.path.split(name)[0], eval(l[9:]))
-                lines[i] = read_file(p2, includes=includes)+'\n'
+                lines[i] = read_file(p2, options=options, includes=includes)+'\n'
     ans = '\n'.join(lines)
     ans2 = ''
     c = 0

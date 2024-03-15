@@ -193,6 +193,8 @@ class Informatics(Ejudge):
     def submission_source(self, id):
         data = self._request_json("/py/problem/run/%d/source"%int(id))
         return data.get('data', {}).get('source', None).encode('utf-8')
+    def action_list(self):
+        return ['start_virtual']
     def do_action(self, action, *args):
         if action == 'start_virtual':
             if self.registered: return False
