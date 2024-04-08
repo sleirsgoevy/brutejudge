@@ -1,7 +1,7 @@
 import urllib.request, urllib.parse, html, json, time
 from brutejudge._http.base import Backend
 from brutejudge.error import BruteError
-from brutejudge._http.ejudge import get, post
+from brutejudge._http.ejudge import do_http, get, post
 import brutejudge._http.html2md as html2md
 import brutejudge._http.types as bjtypes
 
@@ -17,6 +17,7 @@ class CodeForces(Backend):
         Backend.__init__(self)
         self.locale = 'en'
         cf_clearance = None
+        user_agent = None
         if '#' in url:
             url, params = url.rsplit('#', 1)
             params = urllib.parse.parse_qs(params)
@@ -24,6 +25,8 @@ class CodeForces(Backend):
                 self.locale = params['locale'][0]
             if 'cf_clearance' in params:
                 cf_clearance = params['cf_clearance'][0]
+            if 'user_agent' in params:
+                user_agent = params['user_agent'][0]
         if url.startswith('http:'):
             url = 'https:' + url[5:]
         if url.find('/contest') == url.find('/contests'):
@@ -34,7 +37,12 @@ class CodeForces(Backend):
         self.host = url.split('/')[2]
         cookies = {'cf_clearance': cf_clearance} if cf_clearance != None else {}
         if login != None or password != None:
-            code, headers, data = get('https://%s/enter?back=%%2F'%self.host, {'Cookie': '; '.join(map('='.join, cookies.items()))} if cookies else {})
+            req_headers = {}
+            if cookies:
+                req_headers['Cookie'] = '; '.join(map('='.join, cookies.items()))
+            if user_agent != None:
+                req_headers['User-Agent'] = user_agent
+            code, headers, data = get('https://%s/enter?back=%%2F'%self.host, req_headers)
             if code == 403:
                 raise BruteError("CloudFlare is angry at you. Get a token!")
             elif code != 200:
@@ -48,6 +56,8 @@ class CodeForces(Backend):
             else:
                 raise BruteError("No cookies received from server.")
             self.cookie = '; '.join(map('='.join, cookies.items()))
+            self.user_agent = user_agent
+            req_headers['Cookie'] = '; '.join(map('='.join, cookies.items()))
             csrf = self._get_csrf(data.decode('utf-8', 'replace'))
             code, headers, data = post('https://%s/enter?back=%%2F'%self.host, {
                 'csrf_token': csrf,
@@ -56,7 +66,7 @@ class CodeForces(Backend):
                 'bfaa': '',
                 'handleOrEmail': login,
                 'password': password
-            }, {'Cookie': self.cookie, 'Content-Type': 'application/x-www-form-urlencoded'})
+            }, req_headers)
             if code != 302 or headers['Location'] != 'https://%s/'%self.host:
                 raise BruteError("Login failed.")
             if 'Set-Cookie' in headers:
@@ -69,10 +79,13 @@ class CodeForces(Backend):
         self._gs_cache = None
         self._st_cache = None
         self._subms_cache = {}
-    def _get(self, path, codes=set()):
+    def _get(self, path, codes=set(), headers_callback=None):
         if path.startswith('/'):
             path = self.base_url + path
-        code, headers, data = get(path, {'Cookie': self.cookie})
+        headers = {'Cookie': self.cookie}
+        if self.user_agent != None:
+            headers['User-Agent'] = self.user_agent
+        code, headers, data = do_http(path, 'GET', headers, headers_callback=headers_callback)
         if code == 200 and not codes:
             return data
         elif code in codes:
@@ -122,14 +135,16 @@ class CodeForces(Backend):
         return ans
     def _get_submission(self, idx, csrf):
         if idx in self._subms_cache: return self._subms_cache[idx]
+        headers = {
+            'Cookie': self.cookie,
+            'Referer': self.base_url+'/my'
+        }
+        if self.user_agent != None:
+            headers['User-Agent'] = self.user_agent
         code, headers, req = post('https://'+self.host+'/data/submitSource', {
             'submissionId': idx,
             'csrf_token': csrf
-        }, {
-            'Cookie': self.cookie,
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Referer': self.base_url+'/my'
-        })
+        }, headers)
         if code != 200:
             raise BruteError("Failed to fetch submission.")
         ans = json.loads(req.decode('utf-8', 'replace'))
@@ -229,7 +244,10 @@ class CodeForces(Backend):
                 if x in i: break
             else: break
         data = b'\r\n'.join(b'--'+x+b'\r\n'+b'Content-Disposition: form-data; name='+i for i in data)+b'\r\n--'+x+b'--\r\n'
-        post(self.base_url+'/submit?csrf_token='+csrf, data, {'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii'), 'Cookie': self.cookie})
+        headers = {'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii'), 'Cookie': self.cookie}
+        if self.user_agent != None:
+            headers['User-Agent'] = self.user_agent
+        post(self.base_url+'/submit?csrf_token='+csrf, data, headers)
         # TODO: handle error here?
     def submit_solution(self, task, lang, text):
         tasks, langs, csrf = self._get_submit()
@@ -278,10 +296,13 @@ class CodeForces(Backend):
             for j in i['problemResults']])
         for i in data['result']['rows']]
     def _compile_error(self, subm_id, csrf):
+        headers = {'Cookie': self.cookie, 'Content-Type': 'application/x-www-form-urlencoded'}
+        if self.user_agent != None:
+            headers['User-Agent'] = self.user_agent
         code, headers, data = post('https://'+self.host+'/data/judgeProtocol', {
             'submissionId': subm_id,
             'csrf_token': csrf
-        }, {'Cookie': self.cookie, 'Content-Type': 'application/x-www-form-urlencoded'})
+        }, headers)
         if code != 200:
             raise BruteError("Failed to fetch compilation error.")
         return json.loads(data.decode('utf-8', 'replace'))
@@ -295,6 +316,13 @@ class CodeForces(Backend):
     def do_action(self, action, *args):
         if action == 'register':
             url = self.base_url.replace('/contest/', '/contestRegistration/')
+            headers = {
+                'Cookie': self.cookie,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': url,
+            }
+            if self.user_agent != None:
+                headers['User-Agent'] = self.user_agent
             code, headers, data = self._get(url, {200, 302})
             if code != 200:
                 return False
@@ -304,11 +332,7 @@ class CodeForces(Backend):
                 'action': 'formSubmitted',
                 'takePartAs': 'personal',
                 'teamId': '-1',
-            }, {
-                'Cookie': self.cookie,
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Referer': url,
-            })
+            }, headers)
             return code == 302
         else:
             raise BruteError("Not implemented.")
@@ -373,7 +397,10 @@ class CodeForces(Backend):
         return '', q1, q2
     def problem_info(self, prob_id):
         task = self.tasks()[prob_id][1]
-        data = self._get('/problem/'+task+'?locale='+self.locale).decode('utf-8', 'replace')
+        data = self._get('/problem/'+task+'?locale='+self.locale, headers_callback=lambda code, headers: True if headers['Content-Type'] != 'text/html;charset=UTF-8' else None)
+        if data is True:
+            return {}, '['+self.base_url+'/problem/'+task+'?locale='+self.locale+'](Problem statements)'
+        data = data.decode('utf-8', 'replace')
         data = data.split('<div class="property-title">', 1)[1].split('</div><div>', 1)[1]
         data = data.split('<script>')[0]
         data = data.split('<script type="text/javascript">', 1)[0]
@@ -411,6 +438,8 @@ class CodeForces(Backend):
             headers = {}
         else:
             headers = {'Cookie': self.cookie}
+            if self.user_agent != None:
+                headers['User-Agent'] = self.user_agent
             self = self.contest_list_url
         if self.startswith('http:'): self = 'https:' + self[5:]
         code, resp_headers, data = get(self, headers)

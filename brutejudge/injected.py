@@ -3,7 +3,7 @@ import brutejudge.cheats
 injected = """\
 import sys
 
-data = %s.read()
+data = '\\n'.join(i.rstrip() for i in %s.read().strip().split('\\n'))
 
 if data in TESTS:
     stdout = %s

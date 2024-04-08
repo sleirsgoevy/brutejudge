@@ -1,5 +1,6 @@
 import brutejudge.cheats
 from brutejudge.commands.asubmit import get_possible_lang_id
+from brutejudge.commands.astatus import still_running
 import brutejudge.http as http
 from .error import BruteError
 from .injector import Injector
@@ -24,18 +25,26 @@ class Searcher:
     def __getattr__(self, attr):
         def func(*args):
             print("#brute:", attr, args)
-            submissions0 = http.submission_list(self.url, self.cookie)
+            submissions0 = http.submissions(self.url, self.cookie)
             http.submit(self.url, self.cookie, self.task, get_possible_lang_id(self, ('python3', 'pypy3'), self.task), self.injector.call(attr, *args, input_file=self.input_file, output_file=self.output_file))
-            result = [[]]
-            submissions = http.submission_list(self.url, self.cookie)
+            submissions = http.submissions(self.url, self.cookie)
             if submissions == submissions0:
                 raise BruteError("Error sending.")
-            while not result[0]:
-                result = http.submission_results(self.url, self.cookie, submissions[0][0])
-            if self.testno >= len(result[0]):
+            status = submissions[0][2]
+            while still_running(status):
+                print("#running:", status)
+                status = http.submission_status(self.url, self.cookie, submissions[0][0])
+            if status == 'OK':
                 raise Finished
-            print("#result:", result[0][self.testno])
-            return result[0][self.testno] in ('OK', 'Wrong answer', 'Presentation error')
+            if status == 'Partial solution':
+                result = [[]]
+                while not result[0]:
+                    result = http.submission_results(self.url, self.cookie, submissions[0][0])
+                if self.testno >= len(result[0]):
+                    raise Finished
+                status = result[0][self.testno]
+            print("#result:", status)
+            return status in ('OK', 'Wrong answer', 'Presentation error')
         return func
     def int(self, start, stop):
         assert self.index == 0

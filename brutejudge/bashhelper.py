@@ -328,8 +328,10 @@ class ForkingBrute:
                 sys.exit(0)
             except SystemExit: raise
             except BaseException:
-                sys.excepthook(*sys.exc_info())
-                with open(pipe[1], 'wb') as file: file.write(self.brute if self.unpickle_failed else pickle.dumps(self.brute))
+                try:
+                    sys.excepthook(*sys.exc_info())
+                    with open(pipe[1], 'wb') as file: file.write(self.brute if self.unpickle_failed else pickle.dumps(self.brute))
+                except: pass
                 sys.exit(1)
         os.close(pipe[1])
         old = 123

@@ -124,3 +124,19 @@ def md2html(data):
             ll += '<a href="'+html.escape(href)+'">'+html.escape(text)+'</a>'+html.escape(i)
         ans.append(fmt % ll)
     return '\n'.join(ans)
+
+#function for collecting raw html data for debugging html2md
+def monkeypatch():
+    import hashlib, json
+    global html2md
+    old_html2md = html2md
+    def html2md(data, *args, **kwds):
+        h = hashlib.sha256(data.encode('utf-8')).hexdigest()
+        with open('html2md-%s.in'%h, 'w') as file:
+            file.write(data)
+        with open('html2md-%s.args'%h, 'w') as file:
+            file.write(json.dumps({'args': args, 'kwargs': kwds}))
+        data = old_html2md(data, *args, **kwds)
+        with open('html2md-%s.out'%h, 'w') as file:
+            file.write(data)
+        return data

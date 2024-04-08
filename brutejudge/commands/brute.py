@@ -1,4 +1,4 @@
-import brutejudge.cheats
+import brutejudge.cheats, json, sys
 from brutejudge.http import task_list
 from brutejudge.search import Searcher
 from brutejudge.error import BruteError
@@ -28,16 +28,21 @@ def do_brute(self, cmd):
         try: max_tests = int(sp[3])
         except ValueError:
             raise BruteError("max_tests must be a number")
-    srch.execute(code, max_tests)
-    if len(sp) == 2 or sp[2] == '-':
-        from sys import stdout as file
-        do_close = False
-    else:
-        try: file = open(sp[2], "a")
-        except IOError as e:
-            raise BruteError("Error creating output file: " + str(e))
-        do_close = True
-    for i, t in enumerate(srch.tests):
-        print("---------- test #", i, sep='', file=file)
-        print(t, file=file)
-    
+    file = sys.stdout
+    try:
+        if len(sp) == 2 or sp[2] == '-':
+            file = sys.stdout
+        else:
+            try: file = open(sp[2], "r+")
+            except IOError as e:
+                raise BruteError("Error creating output file: " + str(e))
+            for line in file:
+                test = json.loads(line)
+                srch.injector.add_test(test['input'], test['output'])
+                srch.testno += 1
+        srch.execute(code, max_tests)
+        for i, t in enumerate(srch.tests):
+            print(json.dumps({'input': t, 'output': srch.injector.tests[t]}), file=file)
+    finally:
+        if file is not sys.stdout:
+            file.close()

@@ -34,24 +34,40 @@ def format(s, options=set(), stdio=True):
     args = [i.strip() for i in args.split(',')]
     retvals = [i.strip() for i in retvals.split(',')]
     exprs = exprs.strip()
-    code = '''\
+    iostream = '+iostream' in options
+    if iostream:
+        code = '''\
+#include <iostream>
+
+using namespace std;
+
+int main()
+{
+'''
+    else:
+        code = '''\
 #include <stdio.h>
 
 ''' if stdio else ''
-    code += '''\
+        code += '''\
 int main(void)
 {
 '''
     for i in args:
         code += '    '+get_spec_name(i.rsplit(' ', 1)[0])+' '+i.rsplit(' ', 1)[1]+';\n'
-    code += '    scanf("'
-    for i in args:
-        code += get_fmt_name(i.rsplit(' ', 1)[0])
-    code += '"'
-    for i in args:
-        code += ', &'+i.rsplit(' ', 1)[1]
-    code += ');\n'
-    if len(retvals) == 1 and get_fmt_name(retvals[0]) == '%s':
+    if iostream:
+        code += '    cin'+''.join(' >> '+i.rsplit(' ', 1)[1] for i in args)+';\n'
+    else:
+        code += '    scanf("'
+        for i in args:
+            code += get_fmt_name(i.rsplit(' ', 1)[0])
+        code += '"'
+        for i in args:
+            code += ', &'+i.rsplit(' ', 1)[1]
+        code += ');\n'
+    if iostream:
+        code += '    cout << '+exprs+' << endl;\n'
+    elif len(retvals) == 1 and get_fmt_name(retvals[0]) == '%s':
         code += '    puts('+exprs+');\n'
     else:
         code += '    printf("'

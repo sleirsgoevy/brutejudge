@@ -6,7 +6,7 @@ from brutejudge.error import BruteError
 def _http_header_capitalize(h):
     return '-'.join(i[:1].upper()+i[1:].lower() for i in h.split('-'))
 
-def do_http(url, method, headers={}, data=b''):
+def do_http(url, method, headers={}, data=b'', *, headers_callback=None):
     if '://' not in url:
         raise BruteError("Invalid URL")
     proto, path = url.split('://', 1)
@@ -52,7 +52,12 @@ def do_http(url, method, headers={}, data=b''):
             rhd[k].append(v)
         else:
             rhd[k] = v
-    if 'Content-Length' in rhd:
+    if headers_callback != None:
+        data = headers_callback(int(c), rhd)
+    else:
+        data = None
+    if data != None: pass
+    elif 'Content-Length' in rhd:
         data = b''
         while len(data) < int(rhd['Content-Length']):
             data += sock.recv(int(rhd['Content-Length']) - len(data))
@@ -100,6 +105,8 @@ def post(url, data, headers={}):
                     k += ''.join(map('%%%02x'.__mod__, c.encode('utf-8')))
             l.append(k)
         data = '&'.join(l)
+        if 'Content-Type' not in headers:
+            headers['Content-Type'] = 'application/x-www-form-urlencoded'
     if isinstance(data, str):
         data = data.encode('utf-8')
     return do_http(url, 'POST', headers, data)
