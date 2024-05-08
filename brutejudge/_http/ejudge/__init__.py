@@ -1,5 +1,5 @@
 import ssl, socket, html, collections, urllib.parse, time, math
-import brutejudge._http.ejudge.ej371, brutejudge._http.ejudge.ej373, brutejudge._http.html2md as html2md, brutejudge._http.types as bjtypes
+import brutejudge._http.html2md as html2md, brutejudge._http.types as bjtypes
 from brutejudge._http.base import Backend
 from brutejudge.error import BruteError
 
@@ -111,6 +111,8 @@ def post(url, data, headers={}):
         data = data.encode('utf-8')
     return do_http(url, 'POST', headers, data)
 
+import brutejudge._http.ejudge.newstyle_url, brutejudge._http.ejudge.oldstyle_url
+
 def contest_name(url):
     code, headers, data = get(url)
     if code != 200:
@@ -130,26 +132,50 @@ class Ejudge(Backend):
         contest_id = url.split("contest_id=")[1].split("&")[0]
         self.contest_id = int(contest_id)
         base_url = url.split("?")[0]
+        # this action_... button does not seem to be ever checked...
         code, headers, data = post(url0.split("?")[0], {'contest_id': contest_id, 'locale_id': 0, 'login': login, 'password': password, 'action_213': ''})
         if code != 302:
             raise BruteError("Login failed.")
         rhd = dict(headers)
         base_url = rhd['Location'].split('&')[0]
         base_url = base_url.replace('/new-register?', '/new-client?')
-        if 'new-client?SID=' in base_url:
-            urls = ej371.get_urls(base_url)
+        try: self.cookie = rhd["Set-Cookie"].split(";")[0]
+        except KeyError: self.cookie = None
+        if 'new-client?SID=' in base_url or ('?' in base_url and '&action=' in rhd['Location'].split('?', 1)[1]):
+            code, headers, data = get(base_url.split('?', 1)[0])
+            #code, headers, data = get(url0)
+            if code != 200:
+                raise BruteError("Failed to fetch dashboard.")
+            data = data.decode('utf-8', 'replace')
+            if '<p class="ejudge_copyright">' not in data:
+                raise BruteError("No version information.")
+            copyright = data.split('<p class="ejudge_copyright">', 1)[1].split('</p>', 1)[0]
+            if copyright.startswith('This is <a href="'):
+                version = copyright.split(', version ')[1].split(',', 1)[0]
+            elif copyright.startswith('Это &mdash; система'):
+                version = copyright.split(', версия ')[1].split(',', 1)[0]
+            elif copyright.startswith('<a href="'):
+                copyright = copyright.split('>', 1)[1]
+                assert copyright.startswith('ejudge ')
+                version = copyright.split()[1]
+            else:
+                raise BruteError("Unknown version information format: %s"%copyright)
+            if ' #' in version:
+                version = version.split(' #', 1)[0]
+            if version.endswith('+'):
+                version = version[:-1]
+            urls = oldstyle_url.get_urls(base_url, {'Cookie': self.cookie} if self.cookie else {}, version)
         elif any(i in base_url for i in ('/user/', '/client/', '/register/', '/register?SID=')):
-            urls = ej373.get_urls(base_url)
+            urls = newstyle_url.get_urls(base_url)
         else:
             raise BruteError("Unknown ejudge version.")
         self.urls = urls
-        self.cookie = rhd["Set-Cookie"].split(";")[0]
         self._get_cache = {}
     def _cache_get(self, url, cookie=True):
         with self.cache_lock:
             if url in self._get_cache:
                 return self._get_cache[url]
-        ans = get(url, {'Cookie': self.cookie} if cookie else {})
+        ans = get(url, {'Cookie': self.cookie} if cookie and self.cookie else {})
         with self.cache_lock:
             if self.caching: self._get_cache[url] = ans
         return ans
@@ -169,21 +195,37 @@ class Ejudge(Backend):
 #       return data
     @staticmethod
     def _task_ids(data):
-        try:
-            data = data.split('<tr id="probNavTopList"><td width="100%" class="nTopNavList"><ul class="nTopNavList"><li class="first-rad">', 1)[1].split('\n', 1)[0]
-        except IndexError:
-            try:
-                data = data.split('<td class="b0" id="probNavRightList" valign="top">', 1)[1].split('\n', 1)[0]
-            except IndexError: return []
-        splitted = data.split('<a class="tab" href="')[1:]
-        data = [x.split('"', 1) for x in splitted]
-        ans = []
-        for i in data:
-            ans.append((int(i[0].split('prob_id=', 1)[1]), html.unescape(i[1].split('>', 1)[-1].split('</a>', 1)[0])))
-        return ans
+       try:
+           data = data.split('<tr id="probNavTopList"><td width="100%" class="nTopNavList"><ul class="nTopNavList"><li class="first-rad">', 1)[1].split('\n', 1)[0]
+       except IndexError:
+           try:
+               data = data.split('<td class="b0" id="probNavRightList" valign="top">', 1)[1].split('\n', 1)[0]
+           except IndexError: return []
+       splitted = data.split('<a class="tab" href="')[1:]
+       data = [x.split('"', 1) for x in splitted]
+       ans = []
+       for i in data:
+           ans.append((int(i[0].split('prob_id=', 1)[1]), html.unescape(i[1].split('>', 1)[-1].split('</a>', 1)[0])))
+       return ans
     def tasks(self):
+        if 'task_select' in self.urls:
+            code, headers, data = self._cache_get(self.urls['task_select'])
+            if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
+                raise BruteError("Password change is required.")
+            if code != 200:
+                raise BruteError("Failed to fetch task list.")
+            ans = []
+            data = data.decode('utf-8', 'replace').split('<select name="prob_id">', 1)[1].split('</select>', 1)[0]
+            for i in data.split('<option value="')[1:]:
+                key, value = i.split('">', 1)
+                value = html.unescape(value.split('<', 1)[0])
+                if not key and not value: continue
+                key = int(key)
+                short_name, long_name = value.split(' - ', 1)
+                ans.append(bjtypes.task_t(key, short_name, long_name))
+            return ans
         code, headers, data = self._cache_get(self.urls['summary'])
-        if b'<input type="submit" name="action_35" value="Change!" />' in data:
+        if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
         if code != 200:
             raise BruteError("Failed to fetch task list.")
@@ -195,11 +237,11 @@ class Ejudge(Backend):
         return [bjtypes.task_t(i, j, None) for i, j in ti]
     def submissions(self):
         code, headers, data = self._cache_get(self.urls['submissions'])
-        if b'<input type="submit" name="action_35" value="Change!" />' in data:
+        if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
         if code != 200:
             raise BruteError("Failed to fetch submission list.")
-        ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8').split('<th class="b1">')[1:]]
+        ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8', 'replace').split('<th class="b1">')[1:]]
         w = len(ths)
         if w == 0: return []
         splitted = data.decode('utf-8').split('<td class="b1">')[1:]
@@ -235,7 +277,7 @@ class Ejudge(Backend):
         return [bjtypes.submission_t(i, j, k, l, m) for i, j, k, l, m in zip(run_ids, task_ids, statuses, scores, oktests)]
     def submission_protocol(self, id):
         code, headers, data = self._cache_get(self.urls['protocol'].format(run_id=id))
-        if b'<input type="submit" name="action_35" value="Change!" />' in data:
+        if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
         if code != 200:
             raise BruteError("Failed to fetch testing protocol.")
@@ -260,7 +302,7 @@ class Ejudge(Backend):
         data.append(b'"lang_id"\r\n\r\n'+str(lang).encode('ascii'))
         data.append(b'"file"; filename="brute.txt"\r\nContent-Type'
                     b': text/plain\r\n\r\n'+text)
-        data.append(b'"action_40"\r\n\r\nSend!')
+        data.append(b'"'+self.urls['submit_run'].encode('ascii')+b'"\r\n\r\nSend!')
         import random
         while True:
             x = b'----------'+str(random.randrange(1, 1000000000)).encode('ascii')
@@ -268,11 +310,13 @@ class Ejudge(Backend):
                 if x in i: break
             else: break
         data = b'\r\n'.join(b'--'+x+b'\r\nContent-Disposition: form-data; name='+i for i in data)+b'\r\n--'+x+b'--\r\n'
-        ans = post(url, data, {'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii'), 'Cookie': self.cookie})
+        headers = {'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii')}
+        if self.cookie: headers['Cookie'] = self.cookie
+        ans = post(url, data, headers)
         with self.cache_lock: self.stop_caching()
     def status(self):
         code, headers, data = self._cache_get(self.urls['summary'])
-        if b'<input type="submit" name="action_35" value="Change!" />' in data:
+        if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
         if code != 200:
             raise BruteError("Failed to fetch task list")
@@ -285,7 +329,7 @@ class Ejudge(Backend):
         return collections.OrderedDict((a, b if b != '&nbsp;' else None) for a, b in zip(data[ths.index('Short name')::w], data[idx::w]))
     def scores(self, *, total=None):
         code, headers, data = self._cache_get(self.urls['summary'])
-        if b'<input type="submit" name="action_35" value="Change!" />' in data:
+        if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
         if code != 200:
             raise BruteError("Failed to fetch task list")
@@ -302,7 +346,7 @@ class Ejudge(Backend):
         return ans
     def compile_error(self, id):
         code, headers, data = self._cache_get(self.urls['protocol'].format(run_id=id))
-        if b'<input type="submit" name="action_35" value="Change!" />' in data:
+        if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
         if code != 200:
             raise BruteError("Failed to fetch testing protocol.")
@@ -318,7 +362,7 @@ class Ejudge(Backend):
     def submission_source(self, id):
         code, headers, data = self._cache_get(self.urls['source'].format(run_id=id))
         rhd = dict(headers)
-        if 'html' in rhd['Content-Type'] and b'<input type="submit" name="action_35" value="Change!" />' in data:
+        if 'html' in rhd['Content-Type'] and ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
         if code != 200 or 'html' in rhd['Content-Type']:
             return None
@@ -326,13 +370,13 @@ class Ejudge(Backend):
     def action_list(self):
         return ['start_virtual', 'stop_virtual']
     def do_action(self, name, *args):
-        code, headers, data = get(self.urls[name], {'Cookie': self.cookie})
-        if b'<input type="submit" name="action_35" value="Change!" />' in data:
+        code, headers, data = get(self.urls[name], {'Cookie': self.cookie} if self.cookie else {})
+        if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
         return code == 302
     def compiler_list(self, prob_id):
         code, headers, data = self._cache_get(self.urls['submission'].format(prob_id=prob_id))
-        if b'<input type="submit" name="action_35" value="Change!" />' in data:
+        if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
         data = data.decode('utf-8')
         if '<input type="hidden" name="lang_id" value="' in data:
@@ -354,7 +398,7 @@ class Ejudge(Backend):
         return ans
     def submission_stats(self, id):
         code, headers, data = self._cache_get(self.urls['protocol'].format(run_id=id))
-        if b'<input type="submit" name="action_35" value="Change!" />' in data:
+        if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
         data = data.decode('utf-8')
         if '<big>' in data:
@@ -375,7 +419,7 @@ class Ejudge(Backend):
             return ({}, None)
     def contest_info(self):
         code, headers, data = self._cache_get(self.urls['contest_info'])
-        if b'<input type="submit" name="action_35" value="Change!" />' in data:
+        if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
         data = data.decode('utf-8')
         statements_url = None
@@ -413,7 +457,7 @@ class Ejudge(Backend):
         return (pbs, {k.rstrip(':'): v for k, v in datas.items()}, data1)
     def problem_info(self, id):
         code, headers, data = self._cache_get(self.urls['submission'].format(prob_id=id))
-        if b'<input type="submit" name="action_35" value="Change!" />' in data:
+        if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
         data = data.decode('utf-8')
         if '<table class="line-table-wb">' not in data: return ({}, None)
@@ -445,7 +489,7 @@ class Ejudge(Backend):
         return data
     def clar_list(self):
         code, headers, data = self._cache_get(self.urls['clars'])
-        if b'<input type="submit" name="action_35" value="Change!" />' in data:
+        if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
         ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8').split('<th class="b1">')[1:]]
         w = len(ths)
@@ -453,12 +497,12 @@ class Ejudge(Backend):
         data = [x.split("</td>")[0] for x in splitted]
         return [bjtypes.clar_t(i, j) for i, j in zip(map(int, data[ths.index('Clar ID')::w]), map(html.unescape, data[ths.index('Subject')::w]))]
     def submit_clar(self, task, subject, text): 
-        if post(self.urls['submit'], {'SID': self.urls['sid'], 'prob_id': task, 'subject': subject, 'text': text, 'action_41': 'Send!'}, {'Cookie': self.cookie})[0] != 302:
+        if post(self.urls['submit'], {'SID': self.urls['sid'], 'prob_id': task, 'subject': subject, 'text': text, self.urls['submit_clar']: 'Send!'}, {'Cookie': self.cookie} if self.cookie else {})[0] != 302:
             raise BruteError("Failed to submit clar")
         with self.cache_lock: self.stop_caching()
     def read_clar(self, id):
         code, headers, data = self._cache_get(self.urls['read_clar'].format(clar_id=id))
-        if b'<input type="submit" name="action_35" value="Change!" />' in data:
+        if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
         data = html.unescape(data.decode('utf-8').split('<pre class="message">', 1)[1].split('</pre>', 1)[0])
         return data.split('\n', 2)[2]
@@ -537,7 +581,7 @@ class Ejudge(Backend):
         return ans
     def scoreboard(self):
         code, headers, data = self._cache_get(self.urls['standings'])
-        if b'<input type="submit" name="action_35" value="Change!" />' in data:
+        if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
         if code != 200:
             raise BruteError("Failed to fetch scoreboard.")
@@ -557,5 +601,5 @@ class Ejudge(Backend):
             ans.append((name, url, {}))
         return ans
     def change_password(self, oldpwd, newpwd):
-        if post(self.urls['submit'], {'SID': self.urls['sid'], 'oldpasswd': oldpwd, 'newpasswd1': newpwd, 'newpasswd2': newpwd, 'action_35': 'Change!'}, {'Cookie': self.cookie})[0] != 302:
+        if post(self.urls['submit'], {'SID': self.urls['sid'], 'oldpasswd': oldpwd, 'newpasswd1': newpwd, 'newpasswd2': newpwd, self.urls['change_password']: 'Change!'}, {'Cookie': self.cookie} if self.cookie else {})[0] != 302:
             raise BruteError("Failed to change password.")

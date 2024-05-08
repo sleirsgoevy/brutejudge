@@ -10,12 +10,14 @@ def get_urls(main_url):
     if main_url.endswith('/register'):
         main_url = main_url[:-9] + '/user'
     return {
+        # let's assume that for new-style urls action ids do not change...
         'contest_list': main_url.rsplit('/', 1)[0]+'/register',
         'contest_info': main_url + '/main-page/' + sid,
         'summary': main_url + '/view-problem-summary/' + sid,
         'submissions': main_url + '/view-submissions/' + sid + '?all_runs=1',
         'protocol': main_url + '/view-report/' + sid + '?run_id={run_id}',
         'source': main_url + '/download-run/' + sid + '?run_id={run_id}',
+        'task_select': main_url + '/view-problem-submit/' + sid,
         'submission': main_url + '/view-problem-submit/' + sid + '?prob_id={prob_id}',
         'submit': main_url,
         'standings': main_url + '/standings/' + sid,
@@ -24,5 +26,8 @@ def get_urls(main_url):
         'download_file': main_url + '?SID=' + sid[1:] + '&prob_id={prob_id}&action=194&file={filename}',
         'clars': main_url + '/view-clars/' + sid + '?all_clars=1',
         'read_clar': main_url + '/view-clar/' + sid + '?clar_id={clar_id}',
-        'sid': sid[1:]
+        'sid': sid[1:],
+        'change_password': 'action_35',
+        'submit_run': 'action_40',
+        'submit_clar': 'action_41',
     }

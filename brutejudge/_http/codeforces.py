@@ -141,7 +141,7 @@ class CodeForces(Backend):
         }
         if self.user_agent != None:
             headers['User-Agent'] = self.user_agent
-        code, headers, req = post('https://'+self.host+'/data/submitSource', {
+        code, headers, req = post(self.base_url.rsplit('/contest/', 1)[0]+'/data/submitSource', {
             'submissionId': idx,
             'csrf_token': csrf
         }, headers)
@@ -299,7 +299,7 @@ class CodeForces(Backend):
         headers = {'Cookie': self.cookie, 'Content-Type': 'application/x-www-form-urlencoded'}
         if self.user_agent != None:
             headers['User-Agent'] = self.user_agent
-        code, headers, data = post('https://'+self.host+'/data/judgeProtocol', {
+        code, headers, data = post(self.base_url.rsplit('/contest/', 1)[0]+'/data/judgeProtocol', {
             'submissionId': subm_id,
             'csrf_token': csrf
         }, headers)
