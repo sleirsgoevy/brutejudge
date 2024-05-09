@@ -208,13 +208,14 @@ class Ejudge(Backend):
            ans.append((int(i[0].split('prob_id=', 1)[1]), html.unescape(i[1].split('>', 1)[-1].split('</a>', 1)[0])))
        return ans
     def tasks(self):
+        tasks_from_submit = []
+        task_names = {}
         if 'task_select' in self.urls:
             code, headers, data = self._cache_get(self.urls['task_select'])
             if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
                 raise BruteError("Password change is required.")
             if code != 200:
                 raise BruteError("Failed to fetch task list.")
-            ans = []
             data = data.decode('utf-8', 'replace').split('<select name="prob_id">', 1)[1].split('</select>', 1)[0]
             for i in data.split('<option value="')[1:]:
                 key, value = i.split('">', 1)
@@ -222,8 +223,8 @@ class Ejudge(Backend):
                 if not key and not value: continue
                 key = int(key)
                 short_name, long_name = value.split(' - ', 1)
-                ans.append(bjtypes.task_t(key, short_name, long_name))
-            return ans
+                task_names[key] = long_name
+                tasks_from_submit.append(bjtypes.task_t(key, short_name, long_name))
         code, headers, data = self._cache_get(self.urls['summary'])
         if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
             raise BruteError("Password change is required.")
@@ -234,7 +235,9 @@ class Ejudge(Backend):
         ti = self._task_ids(data)
         #if len(tl) < len(ti): tl.extend([None]*(len(ti)-len(tl)))
         #else: ti.extend([None]*(len(tl)-len(ti)))
-        return [bjtypes.task_t(i, j, None) for i, j in ti]
+        if not ti:
+            return tasks_from_submit
+        return [bjtypes.task_t(i, j, task_names.get(i)) for i, j in ti]
     def submissions(self):
         code, headers, data = self._cache_get(self.urls['submissions'])
         if ('<input type="submit" name="'+self.urls['change_password']+'" value="Change!" />').encode('ascii') in data:
