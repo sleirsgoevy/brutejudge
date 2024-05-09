@@ -58,7 +58,7 @@ def get_urls(main_url, headers, version):
         code, headers, data = get(main_url + '&action=' + str(actions.index('NEW_SRV_ACTION_VIEW_CLAR_SUBMIT')), headers)
         if code == 200:
             data = data.decode('utf-8', 'replace')
-            if '<select name="prob_id">' in data and '<input type="text" name="subject"/>' not in data:
+            if '<select name="prob_id">' in data and '<input type="text" name="subject"' not in data:
                 # looks like this is a problem selection page...
                 actions[3:3] = (None, None)
     action_to_idx = dict(map(reversed, enumerate(actions)))
