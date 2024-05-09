@@ -428,6 +428,8 @@ class Ejudge(Backend):
         statements_url = None
         if '" target="_blank">Statements</a></div></li><li><div class="contest_actions_item"><a class="menu" href="' in data:
             statements_url = html.unescape(data.split('" target="_blank">Statements</a></div></li><li><div class="contest_actions_item"><a class="menu" href="', 1)[0].rsplit('"', 1)[1])
+        elif '">Statements</a></div></td><td class="menu"><div class="contest_actions_item"><a class="menu" href="' in data:
+            statements_url = html.unescape(data.split('">Statements</a></div></td><td class="menu"><div class="contest_actions_item"><a class="menu" href="', 1)[0].rsplit('"', 1)[1])
         try: pbs = '\n'.join(html.unescape(i.split('</b></p>', 1)[0]) for i in data.split('<p><b>')[1:])
         except IndexError: pbs = ''
         datas = {}
