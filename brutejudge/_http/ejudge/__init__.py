@@ -6,7 +6,7 @@ from brutejudge.error import BruteError
 def _http_header_capitalize(h):
     return '-'.join(i[:1].upper()+i[1:].lower() for i in h.split('-'))
 
-def do_http(url, method, headers={}, data=b'', *, headers_callback=None):
+def do_http(url, method, headers={}, data=b'', *, headers_callback=None, ssl_context=None):
     if '://' not in url:
         raise BruteError("Invalid URL")
     proto, path = url.split('://', 1)
@@ -23,7 +23,13 @@ def do_http(url, method, headers={}, data=b'', *, headers_callback=None):
     if host.startswith('[') and host.endswith(']'): host = host[1:-1]
     sock = socket.create_connection((host, port))
     if proto == 'https':
-        sock = ssl.create_default_context().wrap_socket(sock, server_hostname=host)
+        if ssl_context != None:
+            ctx = ssl_context
+        else:
+            # cloudflare seems to get really upset if we ignore alpn
+            ctx = ssl.create_default_context()
+            ctx.set_alpn_protocols(['http/1.1'])
+        sock = ctx.wrap_socket(sock, server_hostname=host)
     headers['Host'] = s_host
     if data:
         headers['Content-Length'] = len(data)
@@ -90,10 +96,10 @@ def do_http(url, method, headers={}, data=b'', *, headers_callback=None):
 #       it = requests.request(method, url, data=data, headers=headers, allow_redirects=False)
 #       return (it.status_code, it.headers, it.content)
 
-def get(url, headers={}):
-    return do_http(url, 'GET', headers)
+def get(url, headers={}, *, ssl_context=None):
+    return do_http(url, 'GET', headers, ssl_context=ssl_context)
 
-def post(url, data, headers={}):
+def post(url, data, headers={}, *, ssl_context=None):
     if isinstance(data, dict):
         l = []
         for k, v in data.items():
@@ -109,7 +115,7 @@ def post(url, data, headers={}):
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
     if isinstance(data, str):
         data = data.encode('utf-8')
-    return do_http(url, 'POST', headers, data)
+    return do_http(url, 'POST', headers, data, ssl_context=ssl_context)
 
 import brutejudge._http.ejudge.newstyle_url, brutejudge._http.ejudge.oldstyle_url
 

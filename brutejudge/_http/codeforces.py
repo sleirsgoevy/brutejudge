@@ -1,9 +1,17 @@
-import urllib.request, urllib.parse, html, json, time
+import urllib.request, urllib.parse, html, json, time, ssl, warnings
 from brutejudge._http.base import Backend
 from brutejudge.error import BruteError
 from brutejudge._http.ejudge import do_http, get, post
 import brutejudge._http.html2md as html2md
 import brutejudge._http.types as bjtypes
+
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore")
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+    ctx.verify_mode = ssl.CERT_REQUIRED
+    ctx.check_hostname = True
+    ctx.load_default_certs(ssl.Purpose.SERVER_AUTH)
+    ctx.set_alpn_protocols(['http/1.1'])
 
 class CodeForces(Backend):
     @staticmethod
@@ -17,7 +25,7 @@ class CodeForces(Backend):
         Backend.__init__(self)
         self.locale = 'en'
         cf_clearance = None
-        user_agent = None
+        user_agent = 'brutejudge/1.0'
         if '#' in url:
             url, params = url.rsplit('#', 1)
             params = urllib.parse.parse_qs(params)
@@ -38,15 +46,38 @@ class CodeForces(Backend):
         cookies = {'cf_clearance': cf_clearance} if cf_clearance != None else {}
         if login != None or password != None:
             req_headers = {}
-            if cookies:
-                req_headers['Cookie'] = '; '.join(map('='.join, cookies.items()))
-            if user_agent != None:
-                req_headers['User-Agent'] = user_agent
-            code, headers, data = get('https://%s/enter?back=%%2F'%self.host, req_headers)
-            if code == 403:
-                raise BruteError("CloudFlare is angry at you. Get a token!")
-            elif code != 200:
-                raise BruteError("Error getting CSRF token for login.")
+            while True:
+                if cookies:
+                    req_headers['Cookie'] = '; '.join(map('='.join, cookies.items()))
+                if user_agent != None:
+                    req_headers['User-Agent'] = user_agent
+                code, headers, data = get('https://%s/enter?back=%%2F'%self.host, req_headers, ssl_context=ctx)
+                cookie = headers['Set-Cookie']
+                if isinstance(cookie, str): cookie = [cookie]
+                for i in cookie:
+                    k, v = i.split(';', 1)[0].split('=', 1)
+                    k = k.strip()
+                    v = v.strip()
+                    cookies[k] = v
+                if code == 403:
+                    raise BruteError("CloudFlare is angry at you. Get a token!")
+                elif code != 200:
+                    raise BruteError("Error getting CSRF token for login.")
+                elif b'<p>Please wait. Your browser is being checked. It may take a few seconds...</p>' in data:
+                    #we were given a PoW. try to solve it
+                    pow_suffix = cookies['pow']
+                    #print('PoW requested:', pow_suffix)
+                    import hashlib
+                    idx = 0
+                    while True:
+                        attempt = '%d_%s'%(idx, pow_suffix)
+                        hsh = hashlib.sha1(attempt.encode('ascii')).hexdigest()
+                        if hsh.startswith('0000'): break
+                        idx += 1
+                    #print('PoW solved:', attempt)
+                    cookies['pow'] = attempt
+                else:
+                    break
             if 'Set-Cookie' in headers:
                 new_cookies = headers['Set-Cookie']
                 if isinstance(new_cookies, str): new_cookies = [new_cookies]
@@ -57,7 +88,7 @@ class CodeForces(Backend):
                 raise BruteError("No cookies received from server.")
             self.cookie = '; '.join(map('='.join, cookies.items()))
             self.user_agent = user_agent
-            req_headers['Cookie'] = '; '.join(map('='.join, cookies.items()))
+            req_headers['Cookie'] = self.cookie
             csrf = self._get_csrf(data.decode('utf-8', 'replace'))
             code, headers, data = post('https://%s/enter?back=%%2F'%self.host, {
                 'csrf_token': csrf,
@@ -66,7 +97,7 @@ class CodeForces(Backend):
                 'bfaa': '',
                 'handleOrEmail': login,
                 'password': password
-            }, req_headers)
+            }, req_headers, ssl_context=ctx)
             if code != 302 or headers['Location'] != 'https://%s/'%self.host:
                 raise BruteError("Login failed.")
             if 'Set-Cookie' in headers:
@@ -85,7 +116,7 @@ class CodeForces(Backend):
         headers = {'Cookie': self.cookie}
         if self.user_agent != None:
             headers['User-Agent'] = self.user_agent
-        code, headers, data = do_http(path, 'GET', headers, headers_callback=headers_callback)
+        code, headers, data = do_http(path, 'GET', headers, headers_callback=headers_callback, ssl_context=ctx)
         if code == 200 and not codes:
             return data
         elif code in codes:
@@ -137,14 +168,14 @@ class CodeForces(Backend):
         if idx in self._subms_cache: return self._subms_cache[idx]
         headers = {
             'Cookie': self.cookie,
-            'Referer': self.base_url+'/my'
+            'Referer': self.base_url+'/my',
         }
         if self.user_agent != None:
             headers['User-Agent'] = self.user_agent
         code, headers, req = post(self.base_url.rsplit('/contest/', 1)[0]+'/data/submitSource', {
             'submissionId': idx,
             'csrf_token': csrf
-        }, headers)
+        }, headers, ssl_context=ctx)
         if code != 200:
             raise BruteError("Failed to fetch submission.")
         ans = json.loads(req.decode('utf-8', 'replace'))
@@ -247,7 +278,7 @@ class CodeForces(Backend):
         headers = {'Content-Type': 'multipart/form-data; boundary='+x.decode('ascii'), 'Cookie': self.cookie}
         if self.user_agent != None:
             headers['User-Agent'] = self.user_agent
-        post(self.base_url+'/submit?csrf_token='+csrf, data, headers)
+        post(self.base_url+'/submit?csrf_token='+csrf, data, headers, ssl_context=ctx)
         # TODO: handle error here?
     def submit_solution(self, task, lang, text):
         tasks, langs, csrf = self._get_submit()
@@ -302,7 +333,7 @@ class CodeForces(Backend):
         code, headers, data = post(self.base_url.rsplit('/contest/', 1)[0]+'/data/judgeProtocol', {
             'submissionId': subm_id,
             'csrf_token': csrf
-        }, headers)
+        }, headers, ssl_context=ctx)
         if code != 200:
             raise BruteError("Failed to fetch compilation error.")
         return json.loads(data.decode('utf-8', 'replace'))
@@ -332,7 +363,7 @@ class CodeForces(Backend):
                 'action': 'formSubmitted',
                 'takePartAs': 'personal',
                 'teamId': '-1',
-            }, headers)
+            }, headers, ssl_context=ctx)
             return code == 302
         else:
             raise BruteError("Not implemented.")
@@ -435,17 +466,17 @@ class CodeForces(Backend):
         self._subms_cache.clear()
     def contest_list(self):
         if isinstance(self, str):
-            headers = {}
+            headers = {'User-Agent': 'brutejudge/0.1'}
         else:
             headers = {'Cookie': self.cookie}
             if self.user_agent != None:
                 headers['User-Agent'] = self.user_agent
             self = self.contest_list_url
         if self.startswith('http:'): self = 'https:' + self[5:]
-        code, resp_headers, data = get(self, headers)
+        code, resp_headers, data = get(self, headers, ssl_context=ctx)
         while code in (301, 302):
             self = urllib.parse.urljoin(self, resp_headers['Location'])
-            code, headers, data = get(self, headers)
+            code, headers, data = get(self, headers, ssl_context=ctx)
         if code != 200:
             raise BruteError("Failed to fetch contest list.")
         data = data.decode('utf-8').replace('<tr\r\n     class="highlighted-row"\r\n    data-contestId="', '<tr\r\n    \r\n    data-contestId="').split('<tr\r\n    \r\n    data-contestId="')
