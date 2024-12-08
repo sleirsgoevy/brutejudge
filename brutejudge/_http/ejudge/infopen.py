@@ -1,4 +1,4 @@
-import html
+import html, urllib.parse
 from . import Ejudge, get, post
 from ...error import BruteError
 
@@ -26,11 +26,21 @@ class InfOpen(Ejudge):
             name = html.unescape(i.split(' name="', 1)[1].split('"', 1)[0])
             value = html.unescape(i.split(' value="', 1)[1].split('"', 1)[0]) if ' value="' in i else ''
             form_fields[name] = value
+        arm = False
+        self.standings_url = None
+        for i in page.split('<a class="dropdown-item" href="')[1:]:
+            url1 = urllib.parse.urljoin(url, html.unescape(i.split('"', 1)[0]))
+            if url1.rstrip('/') == url.rstrip('/'):
+                arm = True
+            elif url1.endswith('/standings.html') and arm:
+                arm = False
+                self.standings_url = url1
         Ejudge.__init__(self, 'https://inf-open.ru/ej/client?contest_id='+str(int(form_fields['contest_id'])), form_fields['login'], form_fields['password'])
     def scoreboard(self):
         ans = Ejudge.scoreboard(self)
-        if not ans:
-            code, headers, data = get('https://inf-open.ru/standings.html')
+        if not ans and self.standings_url is not None:
+            code, headers, data = get(self.standings_url)
             if code != 200:
                 raise BruteError("Failed to fetch scoreboard.")
             return self._parse_scoreboard(data)
+        return ans
