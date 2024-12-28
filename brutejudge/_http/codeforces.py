@@ -52,7 +52,7 @@ class CodeForces(Backend):
                 if user_agent != None:
                     req_headers['User-Agent'] = user_agent
                 code, headers, data = get('https://%s/enter?back=%%2F'%self.host, req_headers, ssl_context=ctx)
-                cookie = headers['Set-Cookie']
+                cookie = headers.get('Set-Cookie', [])
                 if isinstance(cookie, str): cookie = [cookie]
                 for i in cookie:
                     k, v = i.split(';', 1)[0].split('=', 1)
@@ -185,7 +185,7 @@ class CodeForces(Backend):
         data = self._get(self.base_url).decode('utf-8')
         ans = []
         ans1 = []
-        sp = data.split('<td class="id">\r\n                        <a href="'+self.base_url.rsplit('codeforces.com', 1)[1]+'/problem/')
+        sp = data.replace('\r\n', '\n').split('<td class="id">\n                        <a href="'+self.base_url.rsplit('codeforces.com', 1)[1]+'/problem/')
         if sp[0].rfind('<') > sp[0].rfind('>'):
             return ans
         for i in sp[1:]:
@@ -298,7 +298,7 @@ class CodeForces(Backend):
     def scores(self):
         with self.cache_lock: data = self._st_cache
         if data == None:
-            data = self._get('/standings?locale=en').decode('utf-8', 'replace')
+            data = self._get('/standings?locale=en').decode('utf-8', 'replace').replace('\r\n', '\n')
             with self.cache_lock:
                 if self.caching: self._st_cache = data
         tasks = (i.split('href="/contest/', 1)[1].split('"', 1)[0].rsplit('/', 1)[1] for i in data.split('<th ')[5:])
@@ -307,7 +307,7 @@ class CodeForces(Backend):
             handle = i.split('<a href="/profile/', 1)[1].split('"', 1)[0]
             if handle != self.handle: continue
             ans = {}
-            for j in i.replace('<td\r\n'+' '*16+'problemId="', '<td\r\n'+' '*16+'>').split('<td\r\n'+' '*16+'>')[1:]:
+            for j in i.replace('<td\n'+' '*16+'problemId="', '<td\n'+' '*16+'>').split('<td\n'+' '*16+'>')[1:]:
                 j = j.split('<span class="cell-', 1)[1].split('>', 1)[1].split('</span>', 1)[0]
                 try: j = int(j)
                 except ValueError: j = -1
@@ -386,10 +386,10 @@ class CodeForces(Backend):
         return (ans, None)
     def contest_info(self):
         ans = {}
-        data = self._get(self.base_url.replace('/contest/', '/contests/')+'?locale=en').decode('utf-8', 'replace')
+        data = self._get(self.base_url.replace('/contest/', '/contests/')+'?locale=en').decode('utf-8', 'replace').replace('\r\n', '\n')
         data = data.split('<span class="format-time"', 1)[1].split('>', 1)[1].strip()
         date = data.split('<', 1)[0] # dd.mm.yyyy hh:mm, Mmm/dd/yyyy hh:mm for English locale!!!
-        duration = data.split('</span>\r\n                </a>\r\n    </td>\r\n    <td>', 1)[1].split('<', 1)[0].strip() # hh:mm
+        duration = data.split('</span>\n                </a>\n    </td>\n    <td>', 1)[1].split('<', 1)[0].strip() # hh:mm
         q1 = {'Start': date, 'Length': duration}
         if ' class="countdown">' in data:
             countdown = data.split(' class="countdown">', 1)[1].split('<', 1)[0].strip() # hh:mm:ss
@@ -435,7 +435,7 @@ class CodeForces(Backend):
         data = data.split('<div class="property-title">', 1)[1].split('</div><div>', 1)[1]
         data = data.split('<script>')[0]
         data = data.split('<script type="text/javascript">', 1)[0]
-        return ({}, html2md.html2md(data, None, self.base_url+'/problems/'+task+'?locale='+self.locale))
+        return ({}, html2md.html2md(data, None, self.base_url+'/problem/'+task+'?locale='+self.locale))
     def download_file(self, *args):
         raise BruteError("File download doesn't exist on CodeForces")
     def clar_list(self):
@@ -479,7 +479,7 @@ class CodeForces(Backend):
             code, headers, data = get(self, headers, ssl_context=ctx)
         if code != 200:
             raise BruteError("Failed to fetch contest list.")
-        data = data.decode('utf-8').replace('<tr\r\n     class="highlighted-row"\r\n    data-contestId="', '<tr\r\n    \r\n    data-contestId="').split('<tr\r\n    \r\n    data-contestId="')
+        data = data.decode('utf-8').replace('\r\n', '\n').replace('<tr\n     class="highlighted-row"\n    data-contestId="', '<tr\n    \n    data-contestId="').split('<tr\n    \n    data-contestId="')
         ans = []
         for i in data[1:]:
             cid, name = i.split('"', 1)
