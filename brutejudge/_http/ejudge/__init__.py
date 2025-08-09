@@ -1,4 +1,4 @@
-import ssl, socket, html, collections, urllib.parse, time, math
+import ssl, socket, html, collections, urllib.parse, time, math, os
 import brutejudge._http.html2md as html2md, brutejudge._http.types as bjtypes
 from brutejudge._http.base import Backend
 from brutejudge.error import BruteError
@@ -6,23 +6,45 @@ from brutejudge.error import BruteError
 def _http_header_capitalize(h):
     return '-'.join(i[:1].upper()+i[1:].lower() for i in h.split('-'))
 
-def do_http(url, method, headers={}, data=b'', *, headers_callback=None, ssl_context=None):
+def do_http(url, method, headers={}, data=b'', *, headers_callback=None, ssl_context=None, proxy=...):
     if '://' not in url:
         raise BruteError("Invalid URL")
     proto, path = url.split('://', 1)
     if proto not in ('http', 'https'):
         raise BruteError("Not an HTTP url: " + url)
+    if proxy is ...:
+        proxy = os.environ.get(proto+'_proxy', os.environ.get('http_proxy', None))
+    if proxy != None:
+        proxy_proto, proxy_host = proxy.split('://', 1)
+        if proxy_proto != 'http':
+            raise BruteError("Invalid HTTP proxy %s"%proxy)
+        proxy_host = proxy_host.rstrip('/')
+        if '/' in proxy_host:
+            raise BruteError("HTTP proxy %s contains a path"%proxy)
     if '/' not in path: path += '/'
     s_host, path = path.split('/', 1)
     path = '/' + path
     host = s_host
+    if proxy is not None:
+        host = proxy_host
     if ':' in host:
         host, port = host.rsplit(':', 1)
         port = int(port)
     else: port = 80 if proto == 'http' else 443
     if host.startswith('[') and host.endswith(']'): host = host[1:-1]
     sock = socket.create_connection((host, port))
+    def readline():
+        ans = b''
+        while not ans.endswith(b'\n'): ans += sock.recv(1)
+        return ans
     if proto == 'https':
+        if proxy is not None:
+            request = 'CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n'%(s_host, s_host)
+            sock.sendall(request.encode('utf-8'))
+            version, status, *reason = readline().decode('utf-8', 'replace').split()
+            if status.lstrip('0') != '200':
+                raise BruteError("HTTP proxy CONNECT failed: %s %s"%(status, ' '.join(reason)))
+            while readline().strip(): pass
         if ssl_context != None:
             ctx = ssl_context
         else:
@@ -33,6 +55,8 @@ def do_http(url, method, headers={}, data=b'', *, headers_callback=None, ssl_con
     headers['Host'] = s_host
     if data:
         headers['Content-Length'] = len(data)
+    if proxy is not None and proto == 'http':
+        path = url
     request = ['%s %s HTTP/1.1' % (method, path)]
     for k, v in headers.items():
         request.append(str(k) + ': ' + str(v))
@@ -40,10 +64,6 @@ def do_http(url, method, headers={}, data=b'', *, headers_callback=None, ssl_con
     request.append('')
     sock.sendall('\r\n'.join(request).encode('utf-8'))
     if data: sock.sendall(data)
-    def readline():
-        ans = b''
-        while not ans.endswith(b'\n'): ans += sock.recv(1)
-        return ans
     v, c, *exp = readline().decode('utf-8').split()
     resp_headers = []
     while True:

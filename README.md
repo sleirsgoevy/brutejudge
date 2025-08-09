@@ -58,7 +58,7 @@ read_clar           OK                     missing     inherit missing stub     
 scoreboard          missing                missing     inherit OK      stub        OK         missing OK         missing   OK      OK      missing OK      OK     
 scores              missing                missing     OK      OK      OK          OK         OK      OK         missing   inherit OK      missing OK      OK     
 set_locale          missing                missing     missing missing missing     OK         missing missing    missing   missing missing missing missing missing
-status              missing                missing     OK      OK      OK          OK         OK      OK         missing   inherit missing missing OK      OK     
+status              missing                missing     OK      OK      OK          OK         OK      OK         OK        inherit missing missing OK      OK     
 stop_caching        missing                missing     inherit OK      OK          OK         OK      OK         inherit   inherit OK      OK      OK      OK     
 submission_protocol OK                     missing     OK      OK      OK          OK         OK      OK         OK        inherit OK      missing OK      OK     
 submission_score    missing                missing     OK      missing missing     missing    missing missing    missing   missing missing missing missing missing

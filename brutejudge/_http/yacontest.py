@@ -11,7 +11,10 @@ class YaContest(Backend):
     def detect(url):
         if url.endswith('/'): url = url[:-1]
         if url.endswith('/enter'): url = url[:-6]
-        return url.startswith('https://contest.yandex.ru/contest/') and url[34:].isnumeric()
+        if not url.startswith('https://'):
+            return False
+        host = url.split('/')[2]
+        return host in ('contest.yandex.ru', 'official.contest.yandex.ru', 'contest.yandex.com', 'official.contest.yandex.com') and '/contest/' in url and url.split('/contest/', 1)[1].isnumeric()
     @staticmethod
     def _get_bem(data, sp):
         return json.loads(html.unescape(data.split(sp, 1)[1].split('"', 1)[0]))
@@ -26,9 +29,16 @@ class YaContest(Backend):
         if not self.detect(url):
             raise BruteError("Not a contest.yandex.ru URL")
         self.opener = OpenerWrapper(urllib.request.build_opener(urllib.request.HTTPCookieProcessor))
-        data = self.opener.open('https://passport.yandex.ru/auth?'+urllib.parse.urlencode({'origin': 'consent', 'retpath': 'https://passport.yandex.ru/profile'}), urllib.parse.urlencode({'login': login, 'passwd': passwd}).encode('ascii'))
-        if data.geturl() != 'https://passport.yandex.ru/profile' and not data.geturl().startswith('https://sso.passport.yandex.ru/prepare?'):
-            raise BruteError('Login failed.')
+        if url.startswith('https://official'):
+            host = url.split('/')[2]
+            sk = self._get_sk(self.opener.open('https://'+host+'/login').read().decode('utf-8'))
+            data = self.opener.open('https://'+host+'/login', urllib.parse.urlencode({'sk': sk, 'login': login, 'password': passwd, 'retpath': '/'}).encode('ascii'))
+            if not data.geturl().startswith('https://'+host+'/?success='):
+                raise BruteError("Login failed.")
+        else:
+            data = self.opener.open('https://passport.yandex.ru/auth?'+urllib.parse.urlencode({'origin': 'consent', 'retpath': 'https://passport.yandex.ru/profile'}), urllib.parse.urlencode({'login': login, 'passwd': passwd}).encode('ascii'))
+            if data.geturl() != 'https://passport.yandex.ru/profile' and not data.geturl().startswith('https://sso.passport.yandex.ru/prepare?'):
+                raise BruteError('Login failed.')
         self.url = url
         self.short_url = '/'+url.split('/', 3)[3]
     def tasks(self):
@@ -103,6 +113,24 @@ class YaContest(Backend):
         if '?error=' in data2:
             raise BruteError('Error: '+data2.split('?error=', 1)[1])
         with self.cache_lock: self.stop_caching()
+    def status(self):
+        ans = OrderedDict()
+        data = self.opener.open(self.url+'/problems').read().decode('utf-8', 'replace')
+        for i in data.split('<a class="link" href="'+self.short_url+'/problems/')[1:]:
+            i = i.split('</li>', 1)[0]
+            problem, rest = i.split('"', 1)
+            problem = html.unescape(problem)
+            if not problem: continue
+            if problem.endswith('/'):
+                problem = problem[:-1]
+            ans[problem] = None
+            if '<div class="solution-status ' in i:
+                statuses = i.split('<div class="solution-status ', 1)[1].split('"', 1)[0].split()
+                if 'solution-status_mood_success' in statuses:
+                    ans[problem] = 'OK'
+                elif 'solution-status_mood_fail' in statuses:
+                    ans[problem] = 'Partial solution'
+        return ans
     def submission_source(self, idx):
         return self.opener.open(self.url+'/download-source/'+str(idx)).read()
     def compile_error(self, idx):
