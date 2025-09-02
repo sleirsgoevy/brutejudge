@@ -16,7 +16,8 @@ class YaContest(Backend):
         host = url.split('/')[2]
         return host in ('contest.yandex.ru', 'official.contest.yandex.ru', 'contest.yandex.com', 'official.contest.yandex.com') and '/contest/' in url and url.split('/contest/', 1)[1].isnumeric()
     @staticmethod
-    def _get_bem(data, sp):
+    def _get_bem(data, sp, *auxsp):
+        for i in auxsp: data = data.replace(i, sp)
         return json.loads(html.unescape(data.split(sp, 1)[1].split('"', 1)[0]))
     @classmethod
     def _get_sk(self, data):
@@ -43,7 +44,7 @@ class YaContest(Backend):
         self.short_url = '/'+url.split('/', 3)[3]
     def tasks(self):
         data = self.opener.open(self.url+'/problems/').read().decode('utf-8', 'replace')
-        return [bjtypes.task_t(idx, html.unescape(i), None) for idx, i in enumerate(i for i in (i.split('/', 1)[0] for i in data.split('<a class="link" href="'+self.short_url+'/problems/')[1:]) if '"' not in i)]
+        return [bjtypes.task_t(idx, html.unescape(i), None) for idx, i in enumerate(i for i in (i.split('/', 1)[0] for i in data.replace('<a class="link link_size_s link_view_link" href="', '<a class="link" href="').split('<a class="link" href="'+self.short_url+'/problems/')[1:]) if '"' not in i)]
     @staticmethod
     def _expand_status(st):
         return {
@@ -95,7 +96,7 @@ class YaContest(Backend):
         if isinstance(code, str): code = code.encode('utf-8')
         t = self.tasks()[task][1]
         data = self.opener.open(self.url+'/problems/'+t+'/').read().decode('utf-8', 'replace')
-        prob_id = self._get_bem(data, '<div class="solution solution_type_compiler-list i-bem" data-bem="')['solution']['problemId']
+        prob_id = self._get_bem(data, '<div class="solution solution_type_compiler-list i-bem" data-bem="', '<div class="solution solution_type_compiler-list solution_newMatchSetsView_true i-bem" data-bem="')['solution']['problemId']
         cmplrs = self._compiler_list(data)
         sk = self._get_sk(data)
         data = []
@@ -293,3 +294,28 @@ class YaContest(Backend):
         q = self._clar_list()
         try: return q[idx][2]
         except IndexError: return ''
+    def scoreboard(self):
+        data = self.opener.open(self.url+'/standings').read().decode('utf-8', 'replace')
+        rows = data.split('<td class="table__cell table__cell_role_participant">')[1:]
+        ans = []
+        for i in rows:
+            participant_name = html.unescape(i.split('<span class="user__name">', 1)[1].split('</span>', 1)[0])
+            participant_results = [j.split('</td>', 1)[0] for j in i.replace('<td class="table__cell table__cell_role_result table__cell_group_last">', '<td class="table__cell table__cell_role_result">').split('<td class="table__cell table__cell_role_result">')[1:]]
+            result_ans = []
+            for j in participant_results:
+                q = {'score': None, 'attempts': None}
+                if '<span class="standings-cell standings-cell_type_score standings-cell_color_gray">' not in j:
+                    if '<span class="standings-cell__score">' in j:
+                        score = html.unescape(j.split('<span class="standings-cell__score">', 1)[1].split('</span>', 1)[0]).replace('—', '-')
+                        if score == '+':
+                            q['attempts'] = 0
+                        elif score == '-':
+                            q['attempts'] = -1
+                        elif score[:1] in ('+', '-'):
+                            q['attempts'] = int(score)
+                        else:
+                            try: q['score'] = int(score)
+                            except ValueError: pass
+                result_ans.append(q)
+            ans.append(({"name": participant_name}, result_ans))
+        return ans

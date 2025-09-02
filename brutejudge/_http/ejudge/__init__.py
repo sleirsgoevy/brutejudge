@@ -273,8 +273,13 @@ class Ejudge(Backend):
         ths = [i.split('</th>', 1)[0] for i in data.decode('utf-8', 'replace').split('<th class="b1">')[1:]]
         w = len(ths)
         if w == 0: return []
-        splitted = data.decode('utf-8').split('<td class="b1">')[1:]
-        data = [x.split("</td>")[0] for x in splitted]
+        rows = ('<td class="b1">'+data.decode('utf-8').split('<td class="b1">', 1)[1]).split('</tr>')
+        row_data = [[j.split('</td>', 1)[0] for j in i.split('<td class="b1">')[1:]] for i in rows]
+        while row_data and not row_data[-1]: row_data.pop()
+        for i in row_data:
+            while len(i) < len(ths):
+                i.append(None)
+        data = sum(row_data, [])
         run_ids = list(map(lambda x:(int(x[:-1]) if x[-1:] == '#' else int(x)), data[ths.index('Run ID')::w]))
         task_ids = data[ths.index('Problem')::w]
         if 'Result' in ths:

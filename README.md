@@ -39,34 +39,34 @@ Then type `brutejudge` into the prompt.
 (Note: the following table can be obtained by running `python3 coverage.py`)
 
 ```
-                    AggressiveCacheBackend FileBackend EJFuse  JJS     Informatics CodeForces GCJ     CupsOnline YaContest InfOpen AtCoder FonCode PCMS    Ejudge 
-action_list         OK                     missing     inherit inherit OK          OK         inherit inherit    OK        inherit OK      inherit inherit OK     
-change_password     missing                missing     inherit missing inherit     missing    missing missing    missing   inherit missing missing missing OK     
-clar_list           missing                missing     inherit missing stub        stub       missing missing    OK        inherit OK      missing OK      OK     
-compile_error       OK                     missing     OK      OK      OK          OK         OK      OK         OK        inherit OK      missing OK      OK     
-compiler_list       OK                     missing     OK      OK      OK          OK         OK      OK         OK        inherit OK      missing OK      OK     
-contest_info        missing                missing     OK      OK      OK          OK         OK      OK         OK        inherit OK      OK      OK      OK     
-contest_list        OK                     missing     inherit OK      inherit     OK         OK      OK         inherit   inherit OK      inherit inherit OK     
-detect              OK                     OK          OK      OK      OK          OK         OK      OK         OK        OK      OK      OK      OK      OK     
-do_action           OK                     missing     inherit missing OK          OK         stub    missing    OK        inherit OK      missing stub    OK     
-download_file       missing                missing     inherit missing stub        stub       missing missing    missing   inherit missing missing stub    OK     
-get_samples         missing                missing     OK      OK      stub        OK         missing OK         missing   inherit missing missing missing OK     
-locales             missing                missing     missing missing missing     OK         missing missing    missing   missing missing missing missing missing
-login_type          OK                     missing     inherit OK      inherit     inherit    OK      OK         inherit   inherit inherit inherit inherit inherit
-problem_info        OK                     missing     inherit missing OK          OK         OK      OK         OK        inherit OK      OK      OK      OK     
-read_clar           OK                     missing     inherit missing stub        stub       missing missing    OK        inherit OK      missing OK      OK     
-scoreboard          missing                missing     inherit OK      stub        OK         missing OK         missing   OK      OK      missing OK      OK     
-scores              missing                missing     OK      OK      OK          OK         OK      OK         missing   inherit OK      missing OK      OK     
-set_locale          missing                missing     missing missing missing     OK         missing missing    missing   missing missing missing missing missing
-status              missing                missing     OK      OK      OK          OK         OK      OK         OK        inherit missing missing OK      OK     
-stop_caching        missing                missing     inherit OK      OK          OK         OK      OK         inherit   inherit OK      OK      OK      OK     
-submission_protocol OK                     missing     OK      OK      OK          OK         OK      OK         OK        inherit OK      missing OK      OK     
-submission_score    missing                missing     OK      missing missing     missing    missing missing    missing   missing missing missing missing missing
-submission_source   OK                     missing     OK      OK      OK          OK         OK      OK         OK        inherit OK      missing OK      OK     
-submission_stats    OK                     missing     OK      OK      OK          OK         OK      OK         missing   inherit missing missing OK      OK     
-submission_status   missing                missing     OK      missing missing     missing    missing missing    missing   missing missing missing missing missing
-submissions         missing                missing     OK      OK      OK          OK         OK      OK         OK        inherit OK      OK      OK      OK     
-submit_clar         missing                missing     inherit missing stub        stub       missing missing    OK        inherit OK      missing OK      OK     
-submit_solution     missing                missing     inherit OK      OK          OK         OK      OK         OK        inherit OK      missing OK      OK     
-tasks               OK                     missing     OK      OK      OK          OK         OK      OK         OK        inherit OK      OK      OK      OK     
+                    AggressiveCacheBackend FileBackend EJFuse  CLICS   JJS     Informatics CodeForces GCJ     CupsOnline YaContest InfOpen AtCoder FonCode PCMS    Ejudge 
+action_list         OK                     missing     inherit inherit inherit OK          OK         inherit inherit    OK        inherit OK      inherit inherit OK     
+change_password     missing                missing     inherit missing missing inherit     missing    missing missing    missing   inherit missing missing missing OK     
+clar_list           missing                missing     inherit OK      missing stub        stub       missing missing    OK        inherit OK      missing OK      OK     
+compile_error       OK                     missing     OK      missing OK      OK          OK         OK      OK         OK        inherit OK      missing OK      OK     
+compiler_list       OK                     missing     OK      OK      OK      OK          OK         OK      OK         OK        inherit OK      missing OK      OK     
+contest_info        missing                missing     OK      OK      OK      OK          OK         OK      OK         OK        inherit OK      OK      OK      OK     
+contest_list        OK                     missing     inherit OK      OK      inherit     OK         OK      OK         inherit   inherit OK      inherit inherit OK     
+detect              OK                     OK          OK      OK      OK      OK          OK         OK      OK         OK        OK      OK      OK      OK      OK     
+do_action           OK                     missing     inherit missing missing OK          OK         stub    missing    OK        inherit OK      missing stub    OK     
+download_file       missing                missing     inherit missing missing stub        stub       missing missing    missing   inherit missing missing stub    OK     
+get_samples         missing                missing     OK      missing OK      stub        OK         missing OK         missing   inherit missing missing missing OK     
+locales             missing                missing     missing missing missing missing     OK         missing missing    missing   missing missing missing missing missing
+login_type          OK                     missing     inherit OK      OK      inherit     inherit    OK      OK         inherit   inherit inherit inherit inherit inherit
+problem_info        OK                     missing     inherit missing missing OK          OK         OK      OK         OK        inherit OK      OK      OK      OK     
+read_clar           OK                     missing     inherit OK      missing stub        stub       missing missing    OK        inherit OK      missing OK      OK     
+scoreboard          missing                missing     inherit missing OK      stub        OK         missing OK         OK        OK      OK      missing OK      OK     
+scores              missing                missing     OK      missing OK      OK          OK         OK      OK         missing   inherit OK      missing OK      OK     
+set_locale          missing                missing     missing missing missing missing     OK         missing missing    missing   missing missing missing missing missing
+status              missing                missing     OK      missing OK      OK          OK         OK      OK         OK        inherit missing missing OK      OK     
+stop_caching        missing                missing     inherit OK      OK      OK          OK         OK      OK         inherit   inherit OK      OK      OK      OK     
+submission_protocol OK                     missing     OK      missing OK      OK          OK         OK      OK         OK        inherit OK      missing OK      OK     
+submission_score    missing                missing     OK      missing missing missing     missing    missing missing    missing   missing missing missing missing missing
+submission_source   OK                     missing     OK      OK      OK      OK          OK         OK      OK         OK        inherit OK      missing OK      OK     
+submission_stats    OK                     missing     OK      missing OK      OK          OK         OK      OK         missing   inherit missing missing OK      OK     
+submission_status   missing                missing     OK      missing missing missing     missing    missing missing    missing   missing missing missing missing missing
+submissions         missing                missing     OK      OK      OK      OK          OK         OK      OK         OK        inherit OK      OK      OK      OK     
+submit_clar         missing                missing     inherit OK      missing stub        stub       missing missing    OK        inherit OK      missing OK      OK     
+submit_solution     missing                missing     inherit OK      OK      OK          OK         OK      OK         OK        inherit OK      missing OK      OK     
+tasks               OK                     missing     OK      OK      OK      OK          OK         OK      OK         OK        inherit OK      OK      OK      OK     
 ```
