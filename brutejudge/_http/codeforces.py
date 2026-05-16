@@ -318,7 +318,7 @@ class CodeForces(Backend):
         contest_id = self.base_url.split('/')
         while not contest_id[-1]: contest_id.pop()
         contest_id = int(contest_id[-1])
-        data = json.loads(self._get('https://'+self.host+'/api/contest.standings?contestId=%d&from=1&count=1000000000'%contest_id).decode('utf-8', 'replace'))
+        data = json.loads(self._get('https://'+self.host+'/api/contest.standings?contestId=%d'%contest_id).decode('utf-8', 'replace'))
         if data['status'] != 'OK':
             raise BruteError('Failed to load scoreboard.')
         return [
