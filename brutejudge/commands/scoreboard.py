@@ -12,7 +12,7 @@ def format_single(data):
         else: ans.append(str(attempts))
     return ('', '%s', '%s (%s)')[len(ans)] % tuple(ans)
 
-def do_scoreboard(self, cmd):
+def do_scoreboard(self, cmd, *, command_name='scoreboard'):
     """
     usage: scoreboard
 
@@ -20,7 +20,7 @@ def do_scoreboard(self, cmd):
     """
     cmd = cmd.strip()
     if cmd:
-        return self.do_help('scoreboard')
+        return self.do_help(command_name)
     ts = [i.short_name for i in tasks(self.url, self.cookie)]
     scb = scoreboard(self.url, self.cookie)
     table = [['']+ts]
