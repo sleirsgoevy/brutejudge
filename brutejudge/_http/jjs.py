@@ -273,5 +273,5 @@ class JJS(Backend):
         if code != 200: return ans
         for i in data:
             params['contest'] = i['id']
-            ans.append((url0+'/?'+urllib.parse.urlencode(params), i['title'], {}))
+            ans.append((i['title'], url0+'/?'+urllib.parse.urlencode(params), {}))
         return ans

@@ -73,7 +73,7 @@ class BruteCMD(cmd.Cmd):
             cookie = None
         data = contest_list(url, cookie)
         print("URL\tTitle")
-        for url, title, _ in data:
+        for title, url, _ in data:
             print(url+'\t'+title)
     def do_tasks(self, cmd):
         """

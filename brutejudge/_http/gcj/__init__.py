@@ -201,4 +201,4 @@ class GCJ(Backend):
         data = json.loads(b64decode(data).decode('utf-8', 'replace'))
         contests = [(j['start_ms'], j['title'], j['id']) for i in data['adventures'] if i['competition__str'].replace('_', '').lower() == competition for j in i['challenges']]
         contests.sort()
-        return [(self+'/round/'+k, j, {}) for i, j, k in contests]
+        return [(j, self+'/round/'+k, {}) for i, j, k in contests]
