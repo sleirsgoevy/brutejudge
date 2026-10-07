@@ -16,6 +16,9 @@ class YaContest(Backend):
         host = url.split('/')[2]
         return host in ('contest.yandex.ru', 'official.contest.yandex.ru', 'contest.yandex.com', 'official.contest.yandex.com') and '/contest/' in url and url.split('/contest/', 1)[1].isnumeric()
     @staticmethod
+    def login_type(self):
+        return ['login', 'password', 'cookie']
+    @staticmethod
     def _get_bem(data, sp, *auxsp):
         for i in auxsp: data = data.replace(i, sp)
         return json.loads(html.unescape(data.split(sp, 1)[1].split('"', 1)[0]))
@@ -23,20 +26,24 @@ class YaContest(Backend):
     def _get_sk(self, data):
         try: return data.split('<input type="hidden" name="sk" value="', 1)[1].split('"', 1)[0]
         except IndexError: return self._get_bem(data, '<div class="aside i-bem" data-bem="')['aside']['sk']
-    def __init__(self, url, login, passwd):
+    def __init__(self, url, login, passwd, cookie=None):
         Backend.__init__(self)
         if url.endswith('/'): url = url[:-1]
         if url.endswith('/enter'): url = url[:-6]
         if not self.detect(url):
             raise BruteError("Not a contest.yandex.ru URL")
-        self.opener = OpenerWrapper(urllib.request.build_opener(urllib.request.HTTPCookieProcessor))
-        if url.startswith('https://official'):
+        if cookie is not None:
+            self.opener = OpenerWrapper(urllib.request.build_opener())
+            self.opener.addheaders = [('Cookie', cookie)]
+        elif url.startswith('https://official'):
+            self.opener = OpenerWrapper(urllib.request.build_opener(urllib.request.HTTPCookieProcessor))
             host = url.split('/')[2]
             sk = self._get_sk(self.opener.open('https://'+host+'/login').read().decode('utf-8'))
             data = self.opener.open('https://'+host+'/login', urllib.parse.urlencode({'sk': sk, 'login': login, 'password': passwd, 'retpath': '/'}).encode('ascii'))
             if not data.geturl().startswith('https://'+host+'/?success='):
                 raise BruteError("Login failed.")
         else:
+            self.opener = OpenerWrapper(urllib.request.build_opener(urllib.request.HTTPCookieProcessor))
             data = self.opener.open('https://passport.yandex.ru/auth?'+urllib.parse.urlencode({'origin': 'consent', 'retpath': 'https://passport.yandex.ru/profile'}), urllib.parse.urlencode({'login': login, 'passwd': passwd}).encode('ascii'))
             if data.geturl() != 'https://passport.yandex.ru/profile' and not data.geturl().startswith('https://sso.passport.yandex.ru/prepare?'):
                 raise BruteError('Login failed.')
@@ -78,15 +85,15 @@ class YaContest(Backend):
             task_id = html.unescape(row[header['Задача']].split('<a class="', 1)[1].split('>', 1)[1].split('</a>', 1)[0])
             status = self._expand_status(html.unescape(row[header['Вердикт']].split('<a class="', 1)[1].split('>', 1)[1].split('</a>', 1)[0]))
             test = row[header['Тест']]
-            if test == '-':
-                test = None
-            else:
+            if test.isnumeric():
                 test = int(test)
-            score = row[header['Баллы']]
-            if score == '-':
-                score = None
             else:
+                test = None
+            score = row[header['Баллы']]
+            if score.isnumeric():
                 score = int(score)
+            else:
+                score = None
             stats = {}
             if status == 'Testing...' and test is not None:
                 status = 'Testing, test %d...'%test
@@ -96,12 +103,14 @@ class YaContest(Backend):
         if isinstance(code, str): code = code.encode('utf-8')
         t = self.tasks()[task][1]
         data = self.opener.open(self.url+'/problems/'+t+'/').read().decode('utf-8', 'replace')
-        prob_id = self._get_bem(data, '<div class="solution solution_type_compiler-list i-bem" data-bem="', '<div class="solution solution_type_compiler-list solution_newMatchSetsView_true i-bem" data-bem="')['solution']['problemId']
+        try: prob_id = self._get_bem(data, '<div class="solution solution_type_compiler-list i-bem" data-bem="', '<div class="solution solution_type_compiler-list solution_newMatchSetsView_true i-bem" data-bem="')['solution']['problemId']
+        except IndexError: prob_id = html.unescape(data.split('<a name="', 1)[1].split('"', 1)[0])
         cmplrs = self._compiler_list(data)
         sk = self._get_sk(data)
         data = []
         data.append(b'')
-        data.append(prob_id.encode('ascii')+b'@compilerId"\r\n\r\n'+cmplrs[lang][1].encode('ascii')+b'\r\n')
+        if cmplrs:
+            data.append(prob_id.encode('ascii')+b'@compilerId"\r\n\r\n'+cmplrs[lang][1].encode('ascii')+b'\r\n')
         data.append(prob_id.encode('ascii')+b'@solution"\r\n\r\ntext\r\n')
         data.append(prob_id.encode('ascii')+b'@text"\r\n\r\n'+code+b'\r\n')
         data.append(b'sk"\r\n\r\n'+sk.encode('ascii')+b'\r\n')
@@ -183,7 +192,10 @@ class YaContest(Backend):
     def compiler_list(self, task):
         t = self.tasks()[task][1]
         data = self.opener.open(self.url+'/problems/'+t+'/').read().decode('utf-8', 'replace')
-        return self._compiler_list(data)
+        ans = self._compiler_list(data)
+        if not ans:
+            ans.append((0, 'none', 'No compiler'))
+        return ans
     def action_list(self):
         return ['start_virtual', 'stop_virtual', 'restart_virtual']
     def do_action(self, action):
@@ -239,7 +251,7 @@ class YaContest(Backend):
     def problem_info(self, which):
         task = self.tasks()[which][1]
         data = self.opener.open(self.url+'/problems/'+urllib.parse.quote(task)+'?lang=en').read().decode('utf-8', 'replace')
-        try: title = data.split('<div class="header">', 1)[1].split('<table', 1)[0]
+        try: title = data.split('<div class="header">', 1)[1].split('<table', 1)[0].split('<div class="legend">', 1)[0]
         except IndexError: title = ''
         horz = []
         for i in data.split('<div class="header">', 1)[1].split('<div class="legend">', 1)[0].split('<th>')[1:]:
@@ -261,7 +273,7 @@ class YaContest(Backend):
                 params[values[0]] = ';; '.join(values[1:])
         try: legend = data.split('<div class="legend">', 1)[1].split('<a name="', 1)[0]
         except IndexError: legend = ''
-        legend = html2md(title+legend)
+        legend = html2md((title+legend).replace('<a class="link link_size_s link_view_link link_theme_download inline-block" ', '<a '))
         return params, legend
     def submit_clar(self, task_id, subject, text):
         form = self.opener.open(self.url+'/messages?lang=en').read().decode('utf-8', 'replace')
@@ -319,3 +331,7 @@ class YaContest(Backend):
                 result_ans.append(q)
             ans.append(({"name": participant_name}, result_ans))
         return ans
+    def download_file(self, prob_id, filename):
+        t = self.tasks()[prob_id][1]
+        with self.opener.open(self.url+'/download/'+t+'/') as file:
+            return file.read()
