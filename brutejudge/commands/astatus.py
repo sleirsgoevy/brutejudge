@@ -1,4 +1,4 @@
-import sys
+import sys, math, time
 from brutejudge.http import submissions
 from brutejudge.error import BruteError
 
@@ -18,7 +18,13 @@ def do_astatus(self, cmd):
     idx = 0
     prev = ''
     subm_id = int(subm_id)
+    prev_time = -math.inf
     while True:
+        query_time = prev_time + 0.05
+        cur_time = time.time()
+        if query_time > cur_time:
+            time.sleep(query_time - cur_time)
+            cur_time = query_time
         try:
             cur = next(i.status for i in submissions(self.url, self.cookie) if i.id == subm_id)
         except StopIteration:
@@ -35,3 +41,4 @@ def do_astatus(self, cmd):
         else:
             print(cur)
             break
+        prev_time = cur_time
