@@ -17,7 +17,7 @@ class CodeForces(Backend):
     @staticmethod
     def detect(url):
         url = url.split('/')
-        return len(url) >= 4 and url[0] in ('http:', 'https:') and not url[1] and ('.'+url[2]).endswith('.codeforces.com') and (url[3] in ('contest', 'contests') or len(url) >= 6 and url[3] == 'group' and url[5] in ('contest', 'contests'))
+        return len(url) >= 4 and url[0] in ('http:', 'https:') and not url[1] and ('.'+url[2]).endswith('.codeforces.com') and (url[3] in ('contest', 'contests', 'gym') or len(url) >= 6 and url[3] == 'group' and url[5] in ('contest', 'contests'))
     @staticmethod
     def _get_csrf(data):
         return data.split('<meta name="X-Csrf-Token" content="', 1)[1].split('"', 1)[0]
@@ -51,7 +51,7 @@ class CodeForces(Backend):
                     req_headers['Cookie'] = '; '.join(map('='.join, cookies.items()))
                 if user_agent != None:
                     req_headers['User-Agent'] = user_agent
-                code, headers, data = get('https://%s/enter?back=%%2F'%self.host, req_headers, ssl_context=ctx)
+                code, headers, data = get('https://%s//enter?back=%%2F'%self.host, req_headers, ssl_context=ctx)
                 cookie = headers.get('Set-Cookie', [])
                 if isinstance(cookie, str): cookie = [cookie]
                 for i in cookie:
@@ -90,7 +90,7 @@ class CodeForces(Backend):
             self.user_agent = user_agent
             req_headers['Cookie'] = self.cookie
             csrf = self._get_csrf(data.decode('utf-8', 'replace'))
-            code, headers, data = post('https://%s/enter?back=%%2F'%self.host, {
+            code, headers, data = post('https://%s//enter?back=%%2F'%self.host, {
                 'csrf_token': csrf,
                 'action': 'enter',
                 'ftaa': '',
@@ -122,7 +122,7 @@ class CodeForces(Backend):
         elif code in codes:
             return code, headers, data
         elif code in (301, 302):
-            if headers['Location'] == 'https://%s/enter?back=%%2F'%self.host:
+            if headers['Location'] in ('https://%s/enter?back=%%2F'%self.host, 'https://%s//enter?back=%%2F'%self.host):
                 raise BruteError("Login required (contest not started?)")
             elif headers['Location'] == self.base_url + '/countdown':
                 raise BruteError("Contest not started yet (countdown)")
