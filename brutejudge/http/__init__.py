@@ -30,8 +30,9 @@ for _w in ['tasks', 'submissions', 'submission_protocol', 'task_ids', 'submit_so
 
 del _create_wrapper, _w
 
-def has_feature(url, cookie, methodname, argname):
+def has_feature(url, cookie, methodname, argname=None):
     if not hasattr(url, methodname): return False
+    if argname is None: return True
     m = getattr(url, methodname).__func__.__code__
     return argname in m.co_varnames[:m.co_argcount+m.co_kwonlyargcount]
 
