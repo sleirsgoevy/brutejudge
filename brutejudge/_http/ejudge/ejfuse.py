@@ -156,12 +156,6 @@ class EJFuse(Ejudge):
             return _decode_bytes(subm['compiler_output'])
         else:
             return None
-    def submission_status(self, subm_id):
-        sl = self._submission_list()
-        for i in sl:
-            if i['run_id'] == subm_id:
-                return STATUS_NAMES[i['status']]
-        return None
     def submission_source(self, subm_id):
         code, headers, data = self._cache_get(self.url+'?SID=%s&EJSID=%s&action=download-run&run_id=%%d&json=1'%self.cookies%subm_id, False)
         if code != 200 or headers.get('Content-Type', None) == 'text/json': return None
@@ -207,11 +201,5 @@ class EJFuse(Ejudge):
             tests['fail'] = tests['total'] - tests['success']
         if tests: ans['tests'] = tests
         return (ans, None)
-    #TODO
-    def submission_score(self, subm_id):
-        for i in self._submission_list():
-            if i['run_id'] == subm_id:
-                return i.get('score', None)
-        return None
     def get_samples(self, subm_id):
         return self._get_samples(Ejudge.compile_error(self, subm_id))
