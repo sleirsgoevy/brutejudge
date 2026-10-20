@@ -101,7 +101,7 @@ This function returns the list of allowed languages for a specific problem. `tas
 
 `brutejudge.http.compiler_t = collections.namedtuple('compiler_t', ('id', 'short_name', 'long_name'))`
 
-### `submission_stats(url, cookie, subm_id) -> dict`
+### `submission_stats(url, cookie, subm_id) -> (dict, str)`
 
 Returns a dictionary with statistics on the specified submission. Information is provided on a best-effort basis, e.g. no key is guaranteed to be present.
 
@@ -110,6 +110,8 @@ Returns a dictionary with statistics on the specified submission. Information is
 * `stats["tests"]["fail"]`. The total number of tests that have been failed.
 * `stats["score"]`. The total score for the submission. Note: use `submission_score` if this field is not available.
 * `stats["group_scores"]`. A list of per-group scores gained on each test group.
+
+The second returned value is a human-readable description of the returned stats, if any.
 
 ### `contest_info(url, cookie) -> (str, dict, dict)`
 
