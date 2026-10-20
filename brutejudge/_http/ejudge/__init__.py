@@ -13,7 +13,7 @@ def do_http(url, method, headers={}, data=b'', *, headers_callback=None, ssl_con
     if proto not in ('http', 'https'):
         raise BruteError("Not an HTTP url: " + url)
     if proxy is ...:
-        proxy = os.environ.get(proto+'_proxy', os.environ.get('http_proxy', None))
+        proxy = os.environ.get(proto+'_proxy', os.environ.get('http_proxy', os.environ.get('all_proxy', None)))
     if proxy != None:
         proxy_proto, proxy_host = proxy.split('://', 1)
         if proxy_proto != 'http':
