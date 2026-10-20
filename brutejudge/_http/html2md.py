@@ -68,6 +68,8 @@ def html2md(data, dload_prefix=None, base=None):
             ans += ')' + do_unescape(i[5:], is_code)
         elif i.startswith('var>') or i.startswith('/var>'):
             ans += '$' + do_unescape(i.split('>', 1)[1], is_code)
+        elif i.startswith('span data-w-e-type="formula" '):
+            ans += '$$$' + do_unescape(i.split(' data-value="', 1)[1].split('"', 1), is_code) + '$$$' + do_unescape(i.split('>', 1)[-1], is_code)
         else:
             if i.startswith('/pre>'):
                 if is_code == 'pre':
